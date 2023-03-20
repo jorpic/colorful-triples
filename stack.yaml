@@ -1,3 +1,7 @@
 resolver: lts-20.0
 packages:
 - .
+
+extra-deps:
+  - git: https://github.com/diagrams/diagrams-graphviz
+    commit: a0c94c2965c323da11e4767c21ac991f6eb86017

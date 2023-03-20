@@ -13,6 +13,7 @@ description:         Please see the README on GitHub at <https://github.com/jorp
 
 
 default-extensions:
+- FlexibleContexts
 - ImportQualifiedPost
 - LambdaCase
 - NamedFieldPuns
@@ -43,3 +44,8 @@ executables:
     dependencies:
     - base >= 4.7 && < 5
     - containers
+    - diagrams-lib
+    - diagrams-graphviz
+    - diagrams-svg
+    - graphviz
+    - process
