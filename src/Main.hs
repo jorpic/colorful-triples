@@ -1,7 +1,7 @@
 import Control.Monad (void)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as Map
-import Data.List (foldl', sortBy)
+import Data.List (foldl', sortBy, nub)
 import Data.Ord (comparing)
 
 import System.Process (spawnCommand)
@@ -17,11 +17,14 @@ import Diagrams.Backend.SVG (SVG, renderSVG, B)
 
 type Triple = [Int]
 
-py3 :: Int -> [Triple]
-py3 m
+_MAX :: Int
+_MAX = 7825
+
+py3 :: [Triple]
+py3
   = [ [a,b,c]
-    | a <- [1..m]
-    , b <- [a..m]
+    | a <- [1.._MAX]
+    , b <- [a.._MAX]
     , let ab = a*a + b*b
     , let c = floor $ sqrt $ fromIntegral ab, ab == c*c
     ]
@@ -29,12 +32,12 @@ py3 m
 counts :: [Int] -> IntMap Int
 counts = foldl' (\m x -> Map.insertWith (+) x 1 m) Map.empty
 
+
 main :: IO ()
 main = do
-  let p = py3 7825
-  print ("number of triples", length p)
+  print ("number of triples", length py3)
 
-  let cs = counts $ concat p -- Pt => Count
+  let cs = counts $ concat py3 -- Pt => Count
   print ("number of points", Map.size cs)
   let ccs = counts $ Map.elems cs
   print ("number of points occuring only once", ccs Map.! 1)
@@ -43,11 +46,31 @@ main = do
     $ take 20
     $ sortBy (comparing snd) $ Map.toList cs
 
-  void $ viewGraph $ toGraph $ neighbors 85 p
+  viewRoot 11
+  viewRoot 19
+  viewRoot 23
+  viewRoot 79
+  viewRoot 83
 
 
-viewGraph g = do
-  let file = "graph.svg"
+neighbors :: Int -> Int -> [Triple] -> [Triple]
+neighbors depth root xs
+  | depth <= 0 = []
+  | otherwise = nub $ layer0 ++ layer1
+  where
+    layer0 = filter (elem root) xs
+    layer1 = concat
+      $ map (\r -> take 5 $ neighbors (depth-1) r xs)
+      $ nub $ concat layer0
+
+
+viewRoot root = do
+  let file = show root ++ ".svg"
+  saveGraph file $ toGraph $ neighbors 2 root py3
+  void $ spawnCommand $ "imv -bffffff " ++ file
+
+
+saveGraph file g = do
   g' <- layoutGraph Dot g
   let node n = text (show n) # fontSizeL 8 <> circle 19
   let d = drawGraph
@@ -59,11 +82,7 @@ viewGraph g = do
         )
         g'
   renderSVG file (mkSizeSpec $ V2 (Just 800) (Just 1600)) d
-  spawnCommand $ "imv -bffffff " ++ file
 
-
-neighbors :: Int -> [Triple] -> [Triple]
-neighbors root = filter (elem root)
 
 toGraph xs = mkGraph xs
   $ concatMap (\l -> [(a, b, l) | (a,b) <- pairs $ g Map.! l])
