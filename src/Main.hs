@@ -1,5 +1,6 @@
-import Control.Monad (void)
+import Control.Monad (void, forM_, when)
 import Data.IntMap (IntMap)
+import qualified Data.IntSet as Set
 import qualified Data.IntMap as Map
 import Data.List (foldl', sortBy, nub)
 import Data.Ord (comparing)
@@ -34,6 +35,7 @@ linkMap = foldl'
   (\m t -> foldl' (\n k -> Map.insertWith (++) k [t] n) m t)
   Map.empty
 
+
 dropSingles :: [Triple] -> IO [Triple]
 dropSingles = go
   where
@@ -48,33 +50,52 @@ dropSingles = go
         else return p
 
 
+agg (a,f) = foldl' (\m x -> Map.insertWith f x a m) Map.empty
+
 main :: IO ()
 main = do
   print ("number of triples", length py3)
 
-  void $ dropSingles py3
+  py3' <- dropSingles py3
 
-  -- viewRoot 11
-  -- viewRoot 19
-  -- viewRoot 23
-  -- viewRoot 79
-  -- viewRoot 83
+  let cc = connectedComponents py3'
+  print ("We got couple of components:", map Set.size cc)
+
+  print ("The smaller component contains these points", filter ((<20) . Set.size) cc)
+  -- show the smaller component
+  -- viewRoot 6604 py3'
+
+  -- see "giant component" in wikipedia
+  let mainComponent = head $ filter ((>1000) . Set.size) cc
+  let mc = filter (all (`Set.member` mainComponent)) py3
+  let mcm = linkMap mc
+  print ("distribution of point weights (weight, count)")
+  mapM_ print $ Map.toList $ agg (1,(+)) $ Map.elems $ Map.map length mcm
+
+  -- It is not possible to remove some point from the mainComponent to split
+  -- it into several components. (no bridges)
+  forM_ (Map.keys mcm) $ \k -> do
+    let cc' = connectedComponents $ filter (all (/=k)) mc
+    when (length cc' > 1)
+      $ print (k, length $ mcm Map.! k, map Set.size cc')
 
 
-neighbors :: Int -> Int -> [Triple] -> [Triple]
-neighbors depth root xs
+
+-- FIXME: prevent looping
+neighbors :: Int -> Int -> Int -> [Triple] -> [Triple]
+neighbors depth width root xs
   | depth <= 0 = []
   | otherwise = nub $ layer0 ++ layer1
   where
     layer0 = filter (elem root) xs
     layer1 = concat
-      $ map (\r -> take 5 $ neighbors (depth-1) r xs)
+      $ map (\r -> take width $ neighbors (depth-1) width r xs)
       $ nub $ concat layer0
 
 
-viewRoot root = do
+viewRoot root xs = do
   let file = show root ++ ".svg"
-  saveGraph file $ toGraph $ neighbors 2 root py3
+  saveGraph file $ toGraph $ neighbors 5 100  root xs
   void $ spawnCommand $ "imv -bffffff " ++ file
 
 
@@ -102,5 +123,15 @@ toGraph xs = mkGraph xs
     pairs xs = [(a,b) | a <- xs, b <- xs, a < b]
 
 
-connectedComponents :: [Triple] -> [[Triple]]
-connectedComponents xs = []
+connectedComponents :: [Triple] -> [Set.IntSet]
+connectedComponents xs@((x:_):_)
+  = comp : if length rest == 0
+    then []
+    else connectedComponents rest
+  where
+    g = linkMap xs
+    loop s a
+      | Set.member a s = s
+      | otherwise = foldl' loop (Set.insert a s) $ nub $ concat $ g Map.! a
+    comp = loop Set.empty x
+    rest = filter (any (`Set.notMember` comp)) xs
