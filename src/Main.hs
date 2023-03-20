@@ -29,28 +29,36 @@ py3
     , let c = floor $ sqrt $ fromIntegral ab, ab == c*c
     ]
 
-counts :: [Int] -> IntMap Int
-counts = foldl' (\m x -> Map.insertWith (+) x 1 m) Map.empty
+linkMap :: [Triple] -> IntMap [Triple]
+linkMap = foldl'
+  (\m t -> foldl' (\n k -> Map.insertWith (++) k [t] n) m t)
+  Map.empty
+
+dropSingles :: [Triple] -> IO [Triple]
+dropSingles = go
+  where
+    go p = do
+      let m = linkMap p
+      print ("number of points", Map.size m)
+
+      let s = Map.filter ((== 1) . length) m
+      print ("number of points occuring only once", Map.size s)
+      if Map.size s > 0
+        then go $ filter (all (`Map.notMember` s)) p
+        else return p
 
 
 main :: IO ()
 main = do
   print ("number of triples", length py3)
 
-  let cs = counts $ concat py3 -- Pt => Count
-  print ("number of points", Map.size cs)
-  let ccs = counts $ Map.elems cs
-  print ("number of points occuring only once", ccs Map.! 1)
+  void $ dropSingles py3
 
-  mapM_ print
-    $ take 20
-    $ sortBy (comparing snd) $ Map.toList cs
-
-  viewRoot 11
-  viewRoot 19
-  viewRoot 23
-  viewRoot 79
-  viewRoot 83
+  -- viewRoot 11
+  -- viewRoot 19
+  -- viewRoot 23
+  -- viewRoot 79
+  -- viewRoot 83
 
 
 neighbors :: Int -> Int -> [Triple] -> [Triple]
@@ -88,14 +96,11 @@ toGraph xs = mkGraph xs
   $ concatMap (\l -> [(a, b, l) | (a,b) <- pairs $ g Map.! l])
   $ Map.keys g
   where
-    g = fromTriples xs
+    g = linkMap xs
 
     pairs :: Ord a => [a] -> [(a,a)]
     pairs xs = [(a,b) | a <- xs, b <- xs, a < b]
 
-    fromTriples :: [Triple] -> IntMap [Triple]
-    fromTriples = foldl' (\m t
-      -> Map.insertWith (++) (t!!0) [t]
-      $  Map.insertWith (++) (t!!1) [t]
-      $  Map.insertWith (++) (t!!2) [t]
-      m) Map.empty
+
+connectedComponents :: [Triple] -> [[Triple]]
+connectedComponents xs = []
