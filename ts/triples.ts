@@ -47,11 +47,10 @@ export function graph(N: number) {
   console.log("number of edges", edges.length);
 
   return {
-    edges,
     nodes: Object.keys(triples).map(key => ({
-      key,
-      attributes: {size: 3, label: key}
-    }))
+      key, attributes: {label: key}
+    })),
+    edges
   };
 }
 
