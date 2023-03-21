@@ -36,7 +36,7 @@ ghc-options:
 executables:
   py3:
     main:                Main.hs
-    source-dirs:         src
+    source-dirs:         hs
     ghc-options:
     - -threaded
     - -rtsopts

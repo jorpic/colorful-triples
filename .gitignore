@@ -1,2 +1,5 @@
 .stack-work/
 *~
+dist
+node_modules
+.parcel-cache

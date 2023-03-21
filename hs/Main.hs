@@ -1,7 +1,12 @@
 import Control.Monad (void, forM_, when)
-import Data.IntMap (IntMap)
+import Data.IntSet (IntSet)
 import qualified Data.IntSet as Set
+import Data.IntMap (IntMap)
 import qualified Data.IntMap as Map
+
+import qualified Data.Map.Strict as Map'
+import qualified Data.Set as Set'
+
 import Data.List (foldl', sortBy, nub)
 import Data.Ord (comparing)
 
@@ -28,7 +33,73 @@ py3
     , b <- [a.._MAX]
     , let ab = a*a + b*b
     , let c = floor $ sqrt $ fromIntegral ab, ab == c*c
+    , c <= _MAX
     ]
+
+
+main :: IO ()
+main = do
+  print ("number of triples", length py3)
+
+  py3' <- dropSingles py3
+
+  let [mcPoints] = connectedComponents py3'
+  print ("We got single component with", Set.size mcPoints, "points")
+
+  let mc = filter (all (`Set.member` mcPoints)) py3
+  print ("Number of triples in this component", length mc)
+  let mcm = linkMap mc
+
+  viewRoot 7825 mc
+
+  -- a lot of points has small weight
+  print ("distribution of point weights (weight, count)")
+  mapM_ print $ take 16 $ Map.toList $ agg (1,(+)) $ Map.elems $ Map.map length mcm
+
+  -- It is not possible to remove some point from the mainComponent to split
+  -- it into several components. (no bridges)
+  -- forM_ (Map.keys mcm) $ \k -> do
+  --   let cc' = connectedComponents $ filter (all (/=k)) mc
+  --   when (length cc' > 1)
+  --     $ print (k, length $ mcm Map.! k, map Set.size cc')
+
+  let mpls = joinPoints mcPoints
+  print ("number of points without multiplies", Map.size mpls) -- 551
+  -- mapM_ print $ Map.toList mpls
+
+  let mtls = joinTriples mc
+  print ("number of triples without multiples", Map'.size mtls) -- 1545
+  --mapM_ print $ Map'.toList mtls
+
+
+
+joinPoints :: IntSet -> IntMap [Int]
+joinPoints = loop Map.empty . Set.deleteFindMin
+  where
+    loop m (x, s)
+      | Set.null s = m
+      | Set.null s' = m'
+      | otherwise = loop m' $ Set.deleteFindMin s'
+      where
+        xMul = filter ((`Set.member` s) . snd)
+          $ zip [1..] $ takeWhile (<=_MAX) $ iterate (+x) x
+        m' = Map.insert x (map fst xMul) m
+        s' = Set.difference s (Set.fromList $ map snd xMul)
+
+joinTriples :: [Triple] -> Map'.Map Triple [Int]
+joinTriples = loop Map'.empty . Set'.deleteFindMin . Set'.fromList
+  where
+    loop m (x, s)
+      | Set'.null s = m
+      | Set'.null s' = m'
+      | otherwise = loop m' $ Set'.deleteFindMin s'
+      where
+        xMul = filter ((`Set'.member` s) . snd)
+          $ zip [1..] $ takeWhile (all (<=_MAX)) $ iterate (zipWith (+) x) x
+        m' = Map'.insert x (map fst xMul) m
+        s' = Set'.difference s (Set'.fromList $ map snd xMul)
+
+
 
 linkMap :: [Triple] -> IntMap [Triple]
 linkMap = foldl'
@@ -39,6 +110,7 @@ linkMap = foldl'
 dropSingles :: [Triple] -> IO [Triple]
 dropSingles = go
   where
+    -- FIXME: Writer monad to log stats
     go p = do
       let m = linkMap p
       print ("number of points", Map.size m)
@@ -51,34 +123,6 @@ dropSingles = go
 
 
 agg (a,f) = foldl' (\m x -> Map.insertWith f x a m) Map.empty
-
-main :: IO ()
-main = do
-  print ("number of triples", length py3)
-
-  py3' <- dropSingles py3
-
-  let cc = connectedComponents py3'
-  print ("We got couple of components:", map Set.size cc)
-
-  print ("The smaller component contains these points", filter ((<20) . Set.size) cc)
-  -- show the smaller component
-  -- viewRoot 6604 py3'
-
-  -- see "giant component" in wikipedia
-  let mainComponent = head $ filter ((>1000) . Set.size) cc
-  let mc = filter (all (`Set.member` mainComponent)) py3
-  let mcm = linkMap mc
-  print ("distribution of point weights (weight, count)")
-  mapM_ print $ Map.toList $ agg (1,(+)) $ Map.elems $ Map.map length mcm
-
-  -- It is not possible to remove some point from the mainComponent to split
-  -- it into several components. (no bridges)
-  forM_ (Map.keys mcm) $ \k -> do
-    let cc' = connectedComponents $ filter (all (/=k)) mc
-    when (length cc' > 1)
-      $ print (k, length $ mcm Map.! k, map Set.size cc')
-
 
 
 -- FIXME: prevent looping
@@ -95,7 +139,7 @@ neighbors depth width root xs
 
 viewRoot root xs = do
   let file = show root ++ ".svg"
-  saveGraph file $ toGraph $ neighbors 5 100  root xs
+  saveGraph file $ toGraph $ neighbors 2 5  root xs
   void $ spawnCommand $ "imv -bffffff " ++ file
 
 
@@ -123,7 +167,7 @@ toGraph xs = mkGraph xs
     pairs xs = [(a,b) | a <- xs, b <- xs, a < b]
 
 
-connectedComponents :: [Triple] -> [Set.IntSet]
+connectedComponents :: [Triple] -> [IntSet]
 connectedComponents xs@((x:_):_)
   = comp : if length rest == 0
     then []
