@@ -1,14 +1,20 @@
 import Graph from "graphology";
 import Sigma from "sigma";
 
-const container = document.getElementById("main") as HTMLElement;
+import random from "graphology-layout/random";
+import {assignLayout} from "graphology-layout/utils";
+// import forceAtlas2 from "graphology-layout-forceatlas2";
 
+import triples from "./triples";
+
+const N = 7825;
 const graph = new Graph();
+graph.import(triples.graph(N));
 
-graph.addNode("John", { x: 0, y: 10, size: 5, label: "John", color: "blue" });
-graph.addNode("Mary", { x: 10, y: 0, size: 3, label: "Mary", color: "red" });
+// We initialize the graph with random positions because FA2Layout has an
+// edge-case where the layout cannot be computed if all of your nodes starts
+// with x=0 and y=0.
+assignLayout(graph, random(graph));
 
-graph.addEdge("John", "Mary");
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const renderer = new Sigma(graph, container);
+new Sigma(graph, document.getElementById("main") as HTMLElement);
