@@ -5,11 +5,14 @@ import random from "graphology-layout/random";
 import {assignLayout} from "graphology-layout/utils";
 import forceAtlas2 from "graphology-layout-forceatlas2";
 
-import triples from "./triples";
+import Triples from "./triples";
 
 const N = 7825;
 const graph = new Graph();
-graph.import(triples.graph(N));
+const triples = new Triples(N);
+triples.logStats();
+triples.dropPendants().logStats();
+graph.import(triples.toGraphData());
 
 // We initialize the graph with random positions because FA2Layout has an
 // edge-case where the layout cannot be computed if all of your nodes starts
@@ -18,8 +21,12 @@ random.assign(graph);
 
 const sensibleSettings = forceAtlas2.inferSettings(graph);
 const positions = forceAtlas2(graph, {
-  iterations: 50,
-  settings: sensibleSettings
+  iterations: 20,
+  settings: {
+    ...sensibleSettings,
+    adjustSizes: true,
+    barnesHutOptimize: true,
+  }
 });
 assignLayout(graph, positions);
 

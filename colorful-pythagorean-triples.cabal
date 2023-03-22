@@ -27,7 +27,7 @@ executable py3
   other-modules:
       Paths_colorful_pythagorean_triples
   hs-source-dirs:
-      src
+      hs
   default-extensions:
       FlexibleContexts
       ImportQualifiedPost
