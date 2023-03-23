@@ -1,6 +1,7 @@
 
 export default class Triples {
-  constructor(N: number) {
+
+  static allUpTo(N: number): Triples {
     const triples = {};
     for(let a = 1; a <= N; a++) {
       for(let b = a; b <= N; b++) {
@@ -13,11 +14,10 @@ export default class Triples {
       }
     }
 
-    this.triples = triples;
-    this.points = this.getPoints(triples);
+    return new Triples(triples);
   }
 
-  private getPoints(triples) {
+  static getPoints(triples) {
     const points = {};
     for(let k in triples) {
       for(let x of triples[k]) {
@@ -30,6 +30,15 @@ export default class Triples {
     return points;
   }
 
+  static toGraphData(triples) {
+    return new Triples(triples).toGraphData();
+  }
+
+
+  constructor(triples) {
+    this.triples = triples;
+    this.points = Triples.getPoints(triples);
+  }
 
   logStats() {
     console.log("number of triples", Object.keys(this.triples).length);
@@ -65,7 +74,9 @@ export default class Triples {
         const size = nodeSize(key);
         return {
           key, attributes: {
-            label: key, size,
+            label: key,
+            value: this.triples[key],
+            size,
             color: size > 1
               ? size > 2 ? "#ff5050" : "#50ff50"
               : "#eeeeee"
@@ -89,7 +100,7 @@ export default class Triples {
       for(let p of pendants) {
         this.points[p].forEach(t => delete this.triples[t]);
       }
-      this.points = this.getPoints(this.triples);
+      this.points = Triples.getPoints(this.triples);
       this.dropPendants();
     }
     return this;
