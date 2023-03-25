@@ -3,37 +3,26 @@ import Data.IntSet qualified as Set
 import Data.IntMap.Strict qualified as Map
 import Data.List (sort)
 
--- import View (viewRoot)
--- import GraphAlgos (linkMap, connectedComponents)
-import Triple as T
+import Triple (Triples, Triple, Graph)
+import Triple qualified as T
 import Utils (info, timeIt)
-
-
-
-_MAX :: Int
-_MAX = 7825
-
-py3 :: Triples
-py3 = T.pyth _MAX
 
 
 main :: IO ()
 main = do
-  timeIt $ info "number of triples: %s" $ Set.size py3
-
-  py3' <- timeIt $ do
-    let py3' = dropPendants py3
-    info "number of triples without pendants: %s" $ Set.size py3'
-    return py3'
-
-  let links = linksMap py3'
+  py3 <- timeIt $ do
+    let g0 = T.pyth 7825
+    info "number of triples: %s" $ Set.size $ T.graphTriples g0
+    let g1 = dropPendants g0
+    info "number of triples without pendants: %s"
+      $ Set.size $ T.graphTriples g1
+    return g1
 
   mapM_ print
     $ sort
     [ (t, Set.size ws)
-      | x <- Set.toList py3'
-      , let t = Triple x
-      , let ws = wheels t links
+      | t <- T.graphTriplesList py3
+      , let ws = wheels t py3
       , not $ Set.null ws
     ]
 
@@ -49,33 +38,31 @@ main = do
 --
 
 
-pendants :: Triples -> Triples
+pendants :: Graph -> Triples
 pendants
-  = Set.fromList . map asInt . concat
+  = T.triplesFromList . concat
   . Map.elems . Map.filter ((== 1) . length)
-  . linksMap
+  . T.graphLinks
 
-dropPendants :: Triples -> Triples
-dropPendants triples = case pendants triples of
-  ps | Set.null ps -> triples
-     | otherwise   -> dropPendants $ triples Set.\\ ps
+dropPendants :: Graph -> Graph
+dropPendants g = case pendants g of
+  ps | Set.null ps -> g
+     | otherwise   -> dropPendants $ T.mkGraph $ T.graphTriples g Set.\\ ps
 
 
-wheels :: Triple -> Links -> Triples
-wheels root ls = Set.fromList $ map asInt $ concat $ Map.elems frontLinks
+wheels :: Triple -> Graph -> Triples
+wheels root g = T.triplesFromList $ concat $ Map.elems frontLinks
   where
-    visitedTriples = Set.fromList [asInt root]
-    visitedLinks = Set.fromList $ concatMap links [root]
-    frontTriples = Set.fromList
-      [ asInt t
-      | l <- links root
-      , t <- ls Map.! l
-      , Set.notMember (asInt t) visitedTriples
+    visitedTriples = Set.fromList [T.asInt root]
+    visitedLinks = Set.fromList $ concatMap T.links [root]
+
+    frontTriples = T.triplesFromList
+      [ t
+      | l <- T.links root
+      , t <- T.graphLinks g Map.! l
+      , Set.notMember (T.asInt t) visitedTriples
       ]
     frontLinks
       = Map.filterWithKey
         (\l xs -> Set.notMember l visitedLinks && length xs > 1)
-      $ linksMap frontTriples
-
--- agg :: Foldable t => (a, a -> a -> a) -> t Map.Key -> IntMap a
--- agg (a,f) = foldl' (\m x -> Map.insertWith f x a m) Map.empty
+      $ T.mkLinks frontTriples
