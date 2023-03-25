@@ -90,8 +90,10 @@ const N = 7825;
 const triples = Triples.allUpTo(N);
 triples.logStats();
 triples.dropPendants().logStats();
-const bigGraph = Graph.from(triples.toGraphData(), {type: "mixed"});
+const bigGraph = Graph.from(triples.toGraphData(), {type: "undirected"});
 
 
-const key = "44,240,244";
-showNodeNeighbourhood(bigGraph, key);
+//const key = "625,7800,7825";
+// const key = "264,1073,1105"
+const key = "5220,5481,7569";
+showNodeNeighbourhood(bigGraph, key, 1);
