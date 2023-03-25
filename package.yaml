@@ -28,7 +28,6 @@ ghc-options:
 - -Widentities
 - -Wincomplete-record-updates
 - -Wincomplete-uni-patterns
-- -Wmissing-export-lists
 - -Wmissing-home-modules
 - -Wpartial-fields
 - -Wredundant-constraints
@@ -44,6 +43,7 @@ executables:
     dependencies:
     - base >= 4.7 && < 5
     - containers
+    - integer-roots
     - diagrams-lib
     - diagrams-graphviz
     - diagrams-svg

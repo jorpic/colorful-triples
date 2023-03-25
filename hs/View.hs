@@ -13,7 +13,6 @@ import Diagrams.TwoD.GraphViz
   )
 import Diagrams.Backend.SVG (SVG, renderSVG, B)
 
-import Types
 import GraphAlgos (neighbors, linkMap)
 
 
