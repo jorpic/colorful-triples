@@ -52,7 +52,6 @@ mkTriple a b c
   | otherwise = error $ "invalid triple " ++ show (a, b, c)
 
 
-
 pyth :: Int -> Graph
 pyth n = mkGraph $ Set.fromDistinctAscList
   [ asInt $ mkTriple a b c
@@ -61,5 +60,3 @@ pyth n = mkGraph $ Set.fromDistinctAscList
   , let (isRoot, c) = maybe (False, -1) (True,) $ exactSquareRoot ab
   , isRoot && c <= n
   ]
-
-

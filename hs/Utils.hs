@@ -8,7 +8,8 @@ timeIt f = do
   s <- getCPUTime
   r <- f
   e <- getCPUTime
-  putStrLn $ "time: " ++ show ((fromIntegral $ e - s) / (10^9))
+  let delta = e - s `div` 10^(9::Int) :: Integer
+  putStrLn $ "time: " ++ show delta
   return r
 
 info :: Show val => String -> val -> IO ()

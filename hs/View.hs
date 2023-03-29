@@ -2,45 +2,58 @@ module View where
 
 import Control.Monad (void)
 import Data.IntMap qualified as Map
+import Data.IntSet qualified as Set
+import Data.List (intersect)
+
+
 import System.Process (spawnCommand)
 
-import Data.GraphViz (quickParams, GraphvizCommand(Dot))
-import Diagrams.Prelude
-import Diagrams.TwoD.GraphViz
-  ( mkGraph
-  , layoutGraph
-  , drawGraph
-  )
+import Diagrams.Prelude hiding (view)
+import Diagrams.TwoD.Text (Text)
 import Diagrams.Backend.SVG (SVG, renderSVG, B)
 
-import GraphAlgos (neighbors, linkMap)
+import Triple (Triples, Triple(..))
+import Triple qualified as T
+
+import Algos (wheel)
 
 
-viewRoot root xs = do
-  let file = show root ++ ".svg"
-  saveGraph file $ toGraph $ neighbors 2 5  root xs
+view :: String -> Diagram B -> IO ()
+view name diag = do
+  let file = name ++ ".svg"
+  renderSVG file (mkSizeSpec $ V2 (Just 800) (Just 1600)) diag
   void $ spawnCommand $ "imv -bffffff " ++ file
 
+viewWheels :: String -> [Triples] -> IO ()
+viewWheels name = view name . wheelsDiag
 
-saveGraph file g = do
-  g' <- layoutGraph Dot g
-  let node n = text (show n) # fontSizeL 8 <> circle 19
-  let d = drawGraph
-        (place . node)
-        (\_ _ _ _ e p
-          -> stroke p # lw veryThin
-          <> atPoints (map last $ pathVertices p)
-            (repeat $ text (show e) # fontSize 12)
-        )
-        g'
-  renderSVG file (mkSizeSpec $ V2 (Just 800) (Just 1600)) d
+wheelsDiag :: [Triples] -> Diagram B
+wheelsDiag ws = hcat $ map wheelDiag ws
 
-
-toGraph xs = mkGraph xs
-  $ concatMap (\l -> [(a, b, l) | (a,b) <- pairs $ g Map.! l])
-  $ Map.keys g
+wheelDiag :: Triples -> Diagram B
+wheelDiag triples = nodes
   where
-    g = linkMap xs
+    n = Set.size triples
+    ts = map Triple $ Set.toList triples
 
-    pairs :: Ord a => [a] -> [(a,a)]
-    pairs xs = [(a,b) | a <- xs, b <- xs, a < b]
+    node :: Triple -> Diagram B
+    node t = vcat
+      [ text (show l) # fontSizeL 1.6 # fc black === strutY 1.3
+      | l <- T.links t
+      ]
+      <> circle 3 # lw veryThin # named (asInt t)
+
+    nodes
+      = atPoints
+        (trailVertices $ regPoly n 20)
+        (map node ts)
+      # applyAll
+        [ connectOutside' linkOptions (asInt a) (asInt b)
+        | a <- ts, b <- ts
+        , not $ null $ intersect (T.links a) (T.links b)
+        ]
+
+    linkOptions = with
+      & gaps .~ verySmall
+      & shaftStyle %~ lw veryThin
+      & headLength .~ 0

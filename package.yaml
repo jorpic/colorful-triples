@@ -21,6 +21,7 @@ default-extensions:
 - OverloadedStrings
 - RecordWildCards
 - TupleSections
+- TypeFamilies
 
 ghc-options:
 - -Wall
@@ -45,7 +46,5 @@ executables:
     - containers
     - integer-roots
     - diagrams-lib
-    - diagrams-graphviz
     - diagrams-svg
-    - graphviz
     - process
