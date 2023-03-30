@@ -3,7 +3,7 @@ module Algos where
 import Data.IntSet qualified as Set
 import Data.IntMap.Strict qualified as Map
 
-import Triple (Triples, Triple, Graph)
+import Triple (Triples, Triple(..), Graph)
 import Triple qualified as T
 
 pendants :: Graph -> Triples
@@ -18,13 +18,14 @@ dropPendants g = case pendants g of
      | otherwise   -> dropPendants $ T.mkGraph $ T.graphTriples g Set.\\ ps
 
 
-wheel :: [Triple] -> Graph -> [Triples]
-wheel roots g = rootSet : loop rootSet roots
+wheels :: Int -> [Triple] -> Graph -> [Triples]
+wheels maxLinks roots g = rootSet : loop rootSet roots
   where
     rootSet = T.triplesFromList roots
 
     loop visitedTriples rs
       | Set.null newRoots = []
+      | Set.size (allLinks visitedTriples') > maxLinks = []
       | otherwise
         = newRoots : loop visitedTriples' (map T.Triple $ Set.toList newRoots)
       where
@@ -56,3 +57,7 @@ wheel roots g = rootSet : loop rootSet roots
           = T.triplesFromList $ concat $ Map.elems frontLinks
 
         visitedTriples' = Set.union visitedTriples newRoots
+
+
+allLinks :: Triples -> Set.IntSet
+allLinks = Set.fromList . concatMap (T.links . Triple) . Set.elems

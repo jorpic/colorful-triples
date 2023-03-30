@@ -26,6 +26,7 @@ executable py3
   main-is: Main.hs
   other-modules:
       Algos
+      System
       Triple
       Utils
       View

@@ -5,10 +5,11 @@ import Data.List (foldl', sort, nub)
 
 import System.Environment (getArgs)
 
-import Algos (dropPendants, wheel)
+import Algos (dropPendants, wheels, allLinks)
 import View qualified as V
 import Triple qualified as T
-import Utils (info)
+import System qualified as S
+import Utils (info, timeIt)
 
 main :: IO ()
 main = do
@@ -48,6 +49,45 @@ main = do
   --   , length ws > 1
   --   ]
 
+  let smallWheels =
+        [ ws
+        | (l, ts) <- Map.toList $ T.graphLinks py3
+        , let ws = wheels 25 ts py3
+        , length ws > 2
+        ]
+  info "number of small wheels: %s" $ length smallWheels
+
+  let smallWheelsTriples = Set.unions $ map Set.unions smallWheels
+  info "number of triples in small wheels: %s" $ Set.size smallWheelsTriples
+
+  -- number of systems close to 7825
+  let neighbours = Set.fromList $ map T.asInt $ T.graphLinks py3 Map.! 7825
+  info "number of 7825 neighbours: %s" $ Set.size neighbours
+  let connectedWheels =
+        [ (ws, l)
+        | (l, ts) <- Map.toList $ T.graphLinks py3
+        , let ws = wheels 27 ts py3
+        , length ws > 2
+        , let ts' = Set.unions ws
+        , not $ Set.disjoint ts' neighbours
+        ]
+
+  info "number of connected wheels: %s" $ length connectedWheels
+  -- mapM_ print connectedWheels
+
+  mapM_ print
+    [ (a, b, Set.intersection
+        (Set.unions $ map allLinks wa)
+        (Set.unions $ map allLinks wb)
+      )
+    | (wa, a) <- connectedWheels
+    , (wb, b) <- connectedWheels
+    , a > b
+    ]
+
+
   l <- head <$> getArgs
-  V.viewWheels l
-    $ wheel (T.graphLinks py3 Map.! read l) py3
+  let ws = wheels 27 (T.graphLinks py3 Map.! read l) py3
+  print (map Set.size ws, l)
+  print $ S.wheelsToSystem ws
+  -- V.viewWheels l ws

@@ -5,7 +5,6 @@ import Data.IntMap qualified as Map
 import Data.IntSet qualified as Set
 import Data.List (intersect)
 
-
 import System.Process (spawnCommand)
 
 import Diagrams.Prelude hiding (view)
@@ -14,8 +13,6 @@ import Diagrams.Backend.SVG (SVG, renderSVG, B)
 
 import Triple (Triples, Triple(..))
 import Triple qualified as T
-
-import Algos (wheel)
 
 
 view :: String -> Diagram B -> IO ()
@@ -28,7 +25,7 @@ viewWheels :: String -> [Triples] -> IO ()
 viewWheels name = view name . wheelsDiag
 
 wheelsDiag :: [Triples] -> Diagram B
-wheelsDiag ws = hcat $ map wheelDiag ws
+wheelsDiag ws = hcat $ map wheelDiag $ takeWhile ((<30) . Set.size) ws
 
 wheelDiag :: Triples -> Diagram B
 wheelDiag triples = nodes
