@@ -25,7 +25,7 @@ viewWheels :: String -> [Triples] -> IO ()
 viewWheels name = view name . wheelsDiag
 
 wheelsDiag :: [Triples] -> Diagram B
-wheelsDiag ws = hcat $ map wheelDiag $ takeWhile ((<30) . Set.size) ws
+wheelsDiag ws = hcat $ map wheelDiag $ takeWhile ((<50) . Set.size) ws
 
 wheelDiag :: Triples -> Diagram B
 wheelDiag triples = nodes

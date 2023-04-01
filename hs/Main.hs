@@ -9,7 +9,7 @@ import Algos (dropPendants, wheels, allLinks)
 import View qualified as V
 import Triple qualified as T
 import System qualified as S
-import Utils (info, timeIt)
+import Utils (info)
 
 main :: IO ()
 main = do
@@ -75,19 +75,31 @@ main = do
   info "number of connected wheels: %s" $ length connectedWheels
   -- mapM_ print connectedWheels
 
-  mapM_ print
-    [ (a, b, Set.intersection
-        (Set.unions $ map allLinks wa)
-        (Set.unions $ map allLinks wb)
-      )
-    | (wa, a) <- connectedWheels
-    , (wb, b) <- connectedWheels
-    , a > b
-    ]
+  -- mapM_ print
+  --   [ (a, b, Set.intersection
+  --       (Set.unions $ map allLinks wa)
+  --       (Set.unions $ map allLinks wb)
+  --     )
+  --   | (wa, a) <- connectedWheels
+  --   , (wb, b) <- connectedWheels
+  --   , a > b
+  --   ]
 
+
+  -- let a = 2616
+  -- let b = 2817
+  -- let wa = wheels 27 (T.graphLinks py3 Map.! a) py3
+  -- let sa = S.wheelsToSystem wa
+  -- let wb = wheels 27 (T.graphLinks py3 Map.! b) py3
+  -- let sb = S.wheelsToSystem wb
+  -- print (sa, sb)
+  -- print $ S.join sa sb
 
   l <- head <$> getArgs
-  let ws = wheels 27 (T.graphLinks py3 Map.! read l) py3
-  print (map Set.size ws, l)
-  print $ S.wheelsToSystem ws
-  -- V.viewWheels l ws
+  let ws = wheels 164 (T.graphLinks py3 Map.! read l) py3
+  mapM_ (print . map T.Triple . Set.toList) ws
+  let ws' = map (T.triplesFromList . concat . filter ((>4).length) . Map.elems . T.mkLinks) ws
+  V.viewWheels l ws'
+  print $ map (Map.size . T.mkLinks) ws
+  print $ map (Map.size . T.mkLinks) ws'
+  print $ S.wheelsToSystem ws'
