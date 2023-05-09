@@ -7,6 +7,7 @@ import System.Environment (getArgs)
 
 import Algos (dropPendants, wheels, allLinks)
 import View qualified as V
+import Triple (Triples, Triple(..))
 import Triple qualified as T
 import System qualified as S
 import Utils (info)
@@ -86,20 +87,72 @@ main = do
   --   ]
 
 
-  -- let a = 2616
-  -- let b = 2817
-  -- let wa = wheels 27 (T.graphLinks py3 Map.! a) py3
-  -- let sa = S.wheelsToSystem wa
-  -- let wb = wheels 27 (T.graphLinks py3 Map.! b) py3
-  -- let sb = S.wheelsToSystem wb
-  -- print (sa, sb)
-  -- print $ S.join sa sb
+  let root
+        = reduceWheels 2
+        $ wheels 100 (T.graphLinks py3 Map.! 7825) py3
 
-  l <- head <$> getArgs
-  let ws = wheels 164 (T.graphLinks py3 Map.! read l) py3
-  mapM_ (print . map T.Triple . Set.toList) ws
-  let ws' = map (T.triplesFromList . concat . filter ((>4).length) . Map.elems . T.mkLinks) ws
-  V.viewWheels l ws'
-  print $ map (Map.size . T.mkLinks) ws
-  print $ map (Map.size . T.mkLinks) ws'
-  print $ S.wheelsToSystem ws'
+  let l2 = T.mkLinks $ root !! 1
+  let l2Wheels =
+        [ (l, ws')
+        | (l, ts) <- Map.toList l2
+        , let ws = wheels 128 ts py3
+        , all ((>2) . Set.size) ws
+        , let ws' = if l == 6260
+                then [ws !! 0, ws !! 1, reduceWheel 5 $ ws !! 2]
+                else ws
+        ]
+
+  let allWheels = (7825, root) : l2Wheels
+  print $ sort $ nub $ concatMap (T.links . Triple) $ Set.toList $ head root
+  mapM_ print $ map (map Triple . Set.toList) root
+
+  mapM_
+    (\(l,w) -> V.viewWheels (show l) w)
+    allWheels
+
+  -- mapM_
+  --   (\(l, w) -> print (l, S.wheelsToSystem $ take 2 w))
+  --   allWheels
+
+
+  -- let (_,a) = allWheels !! 1
+  -- S.showSolutions $ S.wheelsToSystem $ take 2 a
+
+  -- mapM_ print
+  --   [ (a, b
+  --     , Set.size $ Set.intersection (wheelLinks wa) (wheelLinks wb)
+  --     , sa, sb
+  --     , S.join sa sb
+  --     )
+  --   | (a, wa) <- allWheels
+  --   , (b, wb) <- allWheels
+  --   , a < b
+  --   , let sa  = S.wheelsToSystem $ take 2 wa
+  --   , let sb  = S.wheelsToSystem $ take 2 wb
+  --   ]
+
+
+  -- l <- head <$> getArgs
+  -- let ws = wheels 164 (T.graphLinks py3 Map.! read l) py3
+  -- mapM_ (print . map Triple . Set.toList) ws
+  -- let ws' = reduceWheel 4 ws
+  -- V.viewWheels l ws'
+  -- print $ map (Map.size . T.mkLinks) ws
+  -- print $ map (Map.size . T.mkLinks) ws'
+  -- print $ S.wheelsToSystem ws'
+
+
+countLinks :: Triples -> Int
+countLinks = Map.size . T.mkLinks
+
+wheelLinks :: [Triples] -> Set.IntSet
+wheelLinks = Set.unions . map (Map.keysSet . T.mkLinks)
+
+reduceWheels :: Int -> [Triples] -> [Triples]
+reduceWheels = map . reduceWheel
+
+reduceWheel :: Int -> Triples -> Triples
+reduceWheel n
+  = T.triplesFromList . concat
+  . filter ((>n) . length)
+  . Map.elems . T.mkLinks

@@ -5,6 +5,7 @@ import Data.IntSet qualified as Set
 import Data.IntMap qualified as Map
 import Data.Bits (shiftR, shiftL, (.|.), (.&.))
 import Data.List (foldl')
+import Text.Printf (printf)
 
 import Triple (Triple(..), Triples)
 import Triple qualified as T
@@ -57,6 +58,12 @@ wheelsToSystem ws
 
     validTriple :: Int -> Mask -> Bool
     validTriple x m = (x .&. m) /= 0 && (x .&. m) /= m
+
+
+showSolutions :: System -> IO ()
+showSolutions (System{..})
+  = mapM_ (putStrLn . reverse . printf "%b")
+  $ Set.toList solutions
 
 
 join :: System -> System -> (System, System)
