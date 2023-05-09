@@ -2,6 +2,7 @@ use std::collections::{BTreeSet, BTreeMap};
 use std::fmt;
 use std::iter;
 
+type Link = u64;
 
 #[derive(Eq, PartialEq, Ord, PartialOrd)]
 #[derive(Copy, Clone)]
@@ -22,7 +23,7 @@ impl Triple {
         )
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = u64> {
+    pub fn iter(&self) -> impl Iterator<Item = Link> {
         let a = iter::once(self.0 & 0xffff);
         let b = iter::once((self.0 >> 16) & 0xffff);
         let c = iter::once((self.0 >> 32) & 0xffff);
@@ -63,13 +64,8 @@ impl Triples {
         self.0.len()
     }
 
-
-    fn empty() -> Self {
-        Triples(vec![])
-    }
-
-    fn singleton(t: Triple) -> Self {
-        Triples(vec![t])
+    pub fn iter(&self) -> impl Iterator<Item = &Triple> {
+        self.0.iter()
     }
 
     fn push(&mut self, t: Triple) {
@@ -77,32 +73,28 @@ impl Triples {
         self.0.push(t);
     }
 
-    pub fn links(&self) -> BTreeSet<u64> {
-        let mut set = BTreeSet::new();
+    pub fn links(&self) -> BTreeSet<Link> {
+        let mut res = BTreeSet::new();
         for t in self.0.iter() {
             for x in t.iter() {
-                set.insert(x);
+                res.insert(x);
             }
         }
-        set
+        res
     }
 
-    pub fn link_weights(&self) -> BTreeMap<u64, u64> {
-        let mut map = BTreeMap::new();
+    pub fn link_weights(&self) -> Vec<usize> {
+        let mut res = vec![0; 8000]; // FIXME: magic constant
         for t in self.0.iter() {
             for x in t.iter() {
-                if let Some(x_weight) = map.get_mut(&x) {
-                    *x_weight += 1;
-                } else {
-                    map.insert(x, 1);
-                }
+                res[x as usize] += 1;
             }
         }
-        map
+        res
     }
 
-    pub fn link_map(&self) -> BTreeMap<u64, Triples> {
-        let mut map = BTreeMap::<u64, Triples>::new();
+    pub fn links_map(&self) -> LinksMap {
+        let mut map = BTreeMap::<Link, Triples>::new();
         for t in self.0.iter() {
             for x in t.iter() {
                 if let Some(x_triples) = map.get_mut(&x) {
@@ -110,24 +102,24 @@ impl Triples {
                     // Triples::push().
                     x_triples.push(*t);
                 } else {
-                    map.insert(x, Triples::singleton(*t));
+                    map.insert(x, Triples(vec![*t]));
                 }
             }
         }
-        map
+        LinksMap(map)
     }
 
-    pub fn filter_by_link_weight(self, min_weight: u64) -> Self {
+    pub fn filter_by_link_weight(self, min_weight: usize) -> Self {
         let mut prev = self;
         let mut done = false;
 
         while !done {
             done = true;
             let link_weight = prev.link_weights();
-            let mut res = Triples::empty();
+            let mut res = Triples(vec![]);
 
             for t in prev.0.iter() {
-                if t.iter().any(|x| *link_weight.get(&x).unwrap_or(&0) < min_weight) {
+                if t.iter().any(|x| link_weight[x as usize] < min_weight) {
                     done = false;
                 } else {
                     res.push(*t);
@@ -140,9 +132,51 @@ impl Triples {
     }
 }
 
+pub struct LinksMap(BTreeMap<Link, Triples>);
+
+impl LinksMap {
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&Link, &Triples)> {
+        self.0.iter()
+    }
+
+    pub fn neighbours(&self, root: Link, width: usize) -> Triples {
+        let mut res = BTreeSet::<Triple>::new();
+        let mut link_traversed = vec![0; 8000]; // FIXME: magic constant
+
+        let add_link_triples = |set: &mut BTreeSet<Triple>, l|
+            self.0.get(&l).iter()
+                .for_each(|ts| ts.iter()
+                    .for_each(|t| { set.insert(*t); }));
+
+        add_link_triples(&mut res, root);
+        link_traversed[root as usize] += 1;
+
+        let mut new_triples = BTreeSet::new();
+        for _ in 1..width {
+            for t in res.iter() {
+                for l in t.iter() {
+                    if link_traversed[l as usize] == 0 {
+                        link_traversed[l as usize] += 1;
+                        add_link_triples(&mut new_triples, l);
+                    }
+                }
+            }
+            res.append(&mut new_triples); // new_triples is empty after this
+        }
+
+        Triples(res.iter().copied().collect())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const N: u64 = 7825;
 
     #[test]
     fn triple_works() {
@@ -152,18 +186,32 @@ mod tests {
     }
 
     #[test]
-    fn pythagorean() {
-        let py = Triples::pythagorean(7825);
+    fn gen_triples() {
+        let py = Triples::pythagorean(N);
         assert_eq!(py.len(), 9472);
         assert_eq!(py.links().len(), 6494);
     }
 
     #[test]
     fn drop_pendants() {
-        let py = Triples::pythagorean(7825);
+        let py = Triples::pythagorean(N);
         assert_eq!(py.len(), 9472);
         let filtered = py.filter_by_link_weight(2);
         assert_eq!(filtered.len(), 7336);
         assert_eq!(filtered.links().len(), 3745);
+    }
+
+    #[test]
+    fn gen_subgraphs() {
+        let py = Triples::pythagorean(N).filter_by_link_weight(2);
+        let links = py.links_map();
+        let mut count = 0;
+        for (l, _) in links.iter() {
+            let sub = links.neighbours(*l, 3).filter_by_link_weight(3);
+            if sub.len() > 0 {
+                count += 1;
+            }
+        }
+        assert_eq!(count, 892);
     }
 }
