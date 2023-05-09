@@ -1,5 +1,6 @@
+#![feature(stmt_expr_attributes)]
 
-use std::collections::{BTreeSet, BTreeMap};
+use std::collections::BTreeMap;
 
 mod triples;
 use triples::*;

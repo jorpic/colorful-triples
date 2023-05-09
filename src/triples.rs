@@ -1,6 +1,5 @@
 use std::collections::{BTreeSet, BTreeMap};
 use std::fmt;
-use std::iter;
 
 type Link = u64;
 
@@ -23,11 +22,23 @@ impl Triple {
         )
     }
 
+    #[inline(always)]
     pub fn iter(&self) -> impl Iterator<Item = Link> {
-        let a = iter::once(self.0 & 0xffff);
-        let b = iter::once((self.0 >> 16) & 0xffff);
-        let c = iter::once((self.0 >> 32) & 0xffff);
-        a.chain(b).chain(c)
+        *self
+    }
+}
+
+impl Iterator for Triple {
+    type Item = Link;
+
+    fn next(&mut self) -> Option<Link> {
+        if self.0 == 0 {
+            None
+        } else {
+            let res = self.0 & 0xffff;
+            self.0 >>= 16;
+            Some(res)
+        }
     }
 }
 
@@ -60,14 +71,17 @@ impl Triples {
         Triples(vec)
     }
 
+    #[inline(always)]
     pub fn len(&self) -> usize {
         self.0.len()
     }
 
+    #[inline(always)]
     pub fn iter(&self) -> impl Iterator<Item = &Triple> {
         self.0.iter()
     }
 
+    #[inline(always)]
     fn push(&mut self, t: Triple) {
         // FIXME: check that Triples are still ordered.
         self.0.push(t);
@@ -76,8 +90,8 @@ impl Triples {
     pub fn links(&self) -> BTreeSet<Link> {
         let mut res = BTreeSet::new();
         for t in self.0.iter() {
-            for x in t.iter() {
-                res.insert(x);
+            for l in t.iter() {
+                res.insert(l);
             }
         }
         res
@@ -135,10 +149,12 @@ impl Triples {
 pub struct LinksMap(BTreeMap<Link, Triples>);
 
 impl LinksMap {
+    #[inline(always)]
     pub fn len(&self) -> usize {
         self.0.len()
     }
 
+    #[inline(always)]
     pub fn iter(&self) -> impl Iterator<Item = (&Link, &Triples)> {
         self.0.iter()
     }
@@ -147,7 +163,9 @@ impl LinksMap {
         let mut res = BTreeSet::<Triple>::new();
         let mut link_traversed = vec![0; 8000]; // FIXME: magic constant
 
-        let add_link_triples = |set: &mut BTreeSet<Triple>, l|
+        let add_link_triples =
+            #[inline(always)]
+            |set: &mut BTreeSet<Triple>, l|
             self.0.get(&l).iter()
                 .for_each(|ts| ts.iter()
                     .for_each(|t| { set.insert(*t); }));
