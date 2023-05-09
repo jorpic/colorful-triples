@@ -1,5 +1,7 @@
-use std::fmt;
 use std::collections::{BTreeSet, BTreeMap};
+use std::fmt;
+use std::iter;
+
 
 #[derive(Eq, PartialEq, Ord, PartialOrd)]
 #[derive(Copy, Clone)]
@@ -19,6 +21,13 @@ impl Triple {
             (self.0 >> 32) & 0xffff,
         )
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = u64> {
+        let a = iter::once(self.0 & 0xffff);
+        let b = iter::once((self.0 >> 16) & 0xffff);
+        let c = iter::once((self.0 >> 32) & 0xffff);
+        a.chain(b).chain(c)
+    }
 }
 
 impl fmt::Display for Triple {
@@ -26,6 +35,7 @@ impl fmt::Display for Triple {
         write!(f, "{:?}", self.to_tuple())
     }
 }
+
 
 pub struct Triples(Vec<Triple>);
 
@@ -70,10 +80,9 @@ impl Triples {
     pub fn links(&self) -> BTreeSet<u64> {
         let mut set = BTreeSet::new();
         for t in self.0.iter() {
-            let tt = t.to_tuple();
-            set.insert(tt.0);
-            set.insert(tt.1);
-            set.insert(tt.2);
+            for x in t.iter() {
+                set.insert(x);
+            }
         }
         set
     }
@@ -81,21 +90,12 @@ impl Triples {
     pub fn link_weights(&self) -> BTreeMap<u64, u64> {
         let mut map = BTreeMap::new();
         for t in self.0.iter() {
-            let (a, b, c) = t.to_tuple();
-            if let Some(ta) = map.get_mut(&a) {
-                *ta += 1;
-            } else {
-                map.insert(a, 1);
-            }
-            if let Some(tb) = map.get_mut(&b) {
-                *tb += 1;
-            } else {
-                map.insert(b, 1);
-            }
-            if let Some(tc) = map.get_mut(&c) {
-                *tc += 1;
-            } else {
-                map.insert(c, 1);
+            for x in t.iter() {
+                if let Some(x_weight) = map.get_mut(&x) {
+                    *x_weight += 1;
+                } else {
+                    map.insert(x, 1);
+                }
             }
         }
         map
@@ -104,22 +104,14 @@ impl Triples {
     pub fn link_map(&self) -> BTreeMap<u64, Triples> {
         let mut map = BTreeMap::<u64, Triples>::new();
         for t in self.0.iter() {
-            let (a, b, c) = t.to_tuple();
-            // We iterate over triples in sorted order, so it is safe to call Triple::push().
-            if let Some(ta) = map.get_mut(&a) {
-                ta.push(*t);
-            } else {
-                map.insert(a, Triples::singleton(*t));
-            }
-            if let Some(tb) = map.get_mut(&b) {
-                tb.push(*t);
-            } else {
-                map.insert(b, Triples::singleton(*t));
-            }
-            if let Some(tc) = map.get_mut(&c) {
-                tc.push(*t);
-            } else {
-                map.insert(c, Triples::singleton(*t));
+            for x in t.iter() {
+                if let Some(x_triples) = map.get_mut(&x) {
+                    // We iterate over triples in sorted order, so it is safe to call
+                    // Triples::push().
+                    x_triples.push(*t);
+                } else {
+                    map.insert(x, Triples::singleton(*t));
+                }
             }
         }
         map
@@ -135,11 +127,7 @@ impl Triples {
             let mut res = Triples::empty();
 
             for t in prev.0.iter() {
-                let (a, b, c) = t.to_tuple();
-                if *link_weight.get(&a).unwrap_or(&0) < min_weight
-                    || *link_weight.get(&b).unwrap_or(&0) < min_weight
-                    || *link_weight.get(&c).unwrap_or(&0) < min_weight
-                {
+                if t.iter().any(|x| *link_weight.get(&x).unwrap_or(&0) < min_weight) {
                     done = false;
                 } else {
                     res.push(*t);
@@ -177,6 +165,5 @@ mod tests {
         let filtered = py.filter_by_link_weight(2);
         assert_eq!(filtered.len(), 7336);
         assert_eq!(filtered.links().len(), 3745);
-
     }
 }
