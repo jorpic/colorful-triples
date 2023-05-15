@@ -1,7 +1,43 @@
 use std::fmt;
 
+use crate::triples::*;
+
+
 type Var = u16;
 type Eqn = Vec<Var>;
+
+pub struct TripleSystem {
+    pub triples: Triples
+}
+
+impl TripleSystem {
+    pub fn eval(&self) -> Vec<u32> {
+        let vars: Vec<Link> = self.triples.links().iter().copied().collect();
+        // FIXME: panic if too many vars
+
+        let mut masks = Vec::new();
+        for t in self.triples.iter() {
+            let mut mask: u32 = 0;
+            for x in t.iter() {
+                if let Ok(i) = vars.binary_search(&x) {
+                    mask |= 1 << i;
+                } else {
+                    panic!("Impossible!");
+                }
+            }
+            masks.push(mask);
+        }
+
+        let mut res = Vec::new();
+        for x in 0..2_u32.pow(vars.len() as u32) {
+            if masks.iter().all(|m| x & m != *m && x & m != 0) {
+                res.push(x);
+            }
+        }
+
+        res
+    }
+}
 
 
 #[derive(Debug)]
@@ -112,44 +148,5 @@ mod tests {
         };
         sys.to_row_echelon();
         println!("{}", sys);
-    }
-
-    #[test]
-    fn test_rre_2() {
-        let mut sys = EqSystem {
-            eqs: vec![
-                vec![48,64,80],
-                vec![48,90,102],
-                vec![54,72,90],
-                vec![54,240,246],
-                vec![64,120,136],
-                vec![72,320,328],
-                vec![80,150,170],
-                vec![90,120,150],
-                vec![90,216,234],
-                vec![90,400,410],
-                vec![90,672,678],
-                vec![102,136,170],
-                vec![120,288,312],
-                vec![120,896,904],
-                vec![150,360,390],
-                vec![150,1120,1130],
-                vec![216,288,360],
-                vec![216,960,984],
-                vec![234,312,390],
-                vec![234,1040,1066],
-                vec![240,320,400],
-                vec![246,328,410],
-                vec![400,960,1040],
-                vec![410,984,1066],
-                vec![672,896,1120],
-                vec![678,904,1130]
-            ]
-        };
-        sys.to_row_echelon();
-        println!("{}", sys);
-    //
-    //
-    // "[[48,136,170,960,984,1040,1066],[54,320,328,960,984,1040,1066],[64,136,960,984,1040,1066,1120,1130],[72,320,328],[80,170,1120,1130],[90,960,984,1040,1066],[102,136,170],[120,960,984,1040,1066,1120,1130],[150,1120,1130],[216,960,984],[234,1040,1066],[240,320,960,1040],[246,328,984,1066],[288,390,960,984,1120,1130],[312,390,1040,1066],[360,390,1120,1130],[400,960,1040],[410,984,1066],[672,904,960,984,1040,1066,1130],[678,904,1130],[896,904,960,984,1040,1066,1120,1130]]"
     }
 }

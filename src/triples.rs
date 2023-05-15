@@ -1,7 +1,7 @@
 use std::collections::{BTreeSet, BTreeMap};
 use std::fmt;
 
-type Link = u64;
+pub type Link = u64;
 
 #[derive(Eq, PartialEq, Ord, PartialOrd)]
 #[derive(Copy, Clone)]
