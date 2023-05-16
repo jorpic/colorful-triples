@@ -49,6 +49,7 @@ impl fmt::Display for Triple {
 }
 
 
+#[derive(Eq, PartialEq, Ord, PartialOrd)]
 pub struct Triples(Vec<Triple>);
 
 impl Triples {
@@ -87,7 +88,11 @@ impl Triples {
         self.0.push(t);
     }
 
-    pub fn links(&self) -> BTreeSet<Link> {
+    pub fn links(&self) -> Vec<Link> {
+        self.link_set().iter().copied().collect()
+    }
+
+    pub fn link_set(&self) -> BTreeSet<Link> {
         let mut res = BTreeSet::new();
         for t in self.0.iter() {
             for l in t.iter() {
