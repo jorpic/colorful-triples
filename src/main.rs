@@ -20,7 +20,7 @@ fn main() {
     let mut blocks_2 = BTreeSet::new();
     for (l, _) in links.iter() {
         let b = links.neighbours(*l, 2).filter_by_link_weight(2);
-        if b.links().len() == 27 {
+        if b.link_set().len() == 27 {
             blocks_2.insert(b);
         }
     }
@@ -29,25 +29,32 @@ fn main() {
     let mut blocks_3 = BTreeSet::new();
     for (l, _) in links.iter() {
         let b = links.neighbours(*l, 3).filter_by_link_weight(3);
-        if b.links().len() == 27 {
+        if b.link_set().len() == 27 {
             blocks_3.insert(b);
         }
     }
     println!("{} blocks of width 3-3-27 found", blocks_3.len());
 
-    let blocks: Vec<_> = blocks_2.union(&blocks_3).collect();
+    let mut blocks: Vec<_> = blocks_2.union(&blocks_3)
+        .map(|x| BfBlock::new(&x))
+        .collect();
     println!("{} total blocks without duplicates", blocks.len());
 
-    let x7825 = links.neighbours(7825, 2).filter_by_link_weight(2);
-    let l7825 = x7825.link_set();
-    let mut b7825 = BfBlock::new(&x7825);
+    for i in 0..blocks.len() {
+        let (ba, other_blocks) = {
+            let (xs, y_ys) = blocks.split_at_mut(i);
+            let (y, ys) = y_ys.split_at_mut(1);
+            (&mut y[0], xs.iter().chain(ys.iter()))
+        };
 
-    for x in &blocks {
-        if l7825.intersection(&x.link_set()).count() > 5 {
-            let b = BfBlock::new(&x);
-            println!("{}", b);
-            let res = b7825.filter_by(&b);
-            println!("{}", res);
+        println!("{}", ba);
+        for bb in other_blocks {
+            if BfBlock::common_links(ba, bb).len() > 7 {
+                let res = ba.filter_by(bb);
+                if res > 0 {
+                    println!("{}", res);
+                }
+            }
         }
     }
 }

@@ -63,7 +63,6 @@ impl BfBlock {
         for y in &other.solutions {
             other_part.insert(y & ys_mask);
         }
-        println!("cl.len = {}, other_part.len = {}", cl.len(), other_part.len());
 
         let mut self_part = BTreeSet::new();
         for y in other_part {
@@ -83,8 +82,9 @@ impl BfBlock {
             }
         }
 
+        let diff = self.solutions.len() - res.len();
         self.solutions = res;
-        self.solutions.len()
+        diff
     }
 
     pub fn common_links(xs: &BfBlock, ys: &BfBlock) -> Vec<Link> {
