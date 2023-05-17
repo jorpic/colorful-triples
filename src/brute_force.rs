@@ -46,6 +46,33 @@ impl BfBlock {
         BfBlock { links, masks, solutions }
     }
 
+    pub fn pair_sets(&self) {
+        let mut pairs = Vec::new();
+        let n = self.links.len() as u32;
+        for i in 0..n {
+            for j in i+1..n {
+                pairs.push((1 << i) | (1 << j));
+            }
+        }
+
+        let mut res: Vec<BTreeSet<u32>> = Vec::new();
+        for _ in &pairs {
+            res.push(BTreeSet::new());
+        }
+
+        for x in &self.solutions {
+            for i in 0..pairs.len() {
+                res[i].insert(x & pairs[i]);
+            }
+        }
+
+        for s in res {
+            if s.len() < 4 {
+                println!("{:?}", s);
+            }
+        }
+    }
+
     pub fn filter_by(&mut self, other: &BfBlock) -> usize {
         let cl = BfBlock::common_links(self, other);
 

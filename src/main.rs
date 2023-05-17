@@ -26,6 +26,12 @@ fn main() {
     }
     println!("{} blocks of width 2-2-27 found", blocks_2.len());
 
+    for b in blocks_2.iter().take(2) {
+        let xxx = BfBlock::new(&b);
+        println!("{}", xxx);
+        xxx.pair_sets();
+    }
+
     let mut blocks_3 = BTreeSet::new();
     for (l, _) in links.iter() {
         let b = links.neighbours(*l, 3).filter_by_link_weight(3);
@@ -34,6 +40,12 @@ fn main() {
         }
     }
     println!("{} blocks of width 3-3-27 found", blocks_3.len());
+
+    for b in blocks_3.iter().take(2) {
+        let xxx = BfBlock::new(&b);
+        println!("{}", xxx);
+        xxx.pair_sets();
+    }
 
     let mut blocks: Vec<_> = blocks_2.union(&blocks_3)
         .map(|x| BfBlock::new(&x))
