@@ -48,8 +48,8 @@ impl BfBlock {
 
     pub fn filter_by(&mut self, other: &BfBlock) -> usize {
         let cl = BfBlock::common_links(self, other);
-        let mut ix = Vec::new();
 
+        let mut ix = Vec::new();
         for l in &cl {
             let i = self.links.binary_search(l).unwrap();
             let j = other.links.binary_search(l).unwrap();
@@ -96,5 +96,67 @@ impl BfBlock {
         }
 
         res
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fmt::Write;
+
+    #[test]
+    fn block_creation() {
+        let ts = Triples::pythagorean(17);
+        let ts_str: Vec<_> = ts.iter().map(|x| {
+            let mut s = String::new();
+            let _ = write!(&mut s, "{}", x);
+            s
+        }).collect();
+
+        assert_eq!(
+            ts_str,
+            vec![
+                "(3, 4, 5)",
+                "(5, 12, 13)",
+                "(6, 8, 10)",
+                "(8, 15, 17)",
+                "(9, 12, 15)"
+            ]);
+
+        let b = BfBlock::new(&ts);
+        assert_eq!(b.links, vec![3, 4, 5, 6, 8, 9, 10, 12, 13, 15, 17]);
+        assert_eq!(
+            b.masks,
+            vec![
+                0b00000000111,
+                0b00110000100,
+                0b00001011000,
+                0b11000010000,
+                0b01010100000,
+            ]);
+    }
+
+    #[test]
+    fn block_filtering() {
+        let mut x = BfBlock {
+            links: vec![3,5,7,9,11,13],
+            masks: vec![],
+            solutions: vec![
+                0b0_u32,
+            ]
+        };
+
+        let y = BfBlock {
+            links: vec![2,3,4,5,6,7,8,10],
+            masks: vec![],
+            solutions: vec![
+                0b11_u32,
+            ]
+        };
+
+        assert_eq!(BfBlock::common_links(&x, &y), vec![3,5,7]);
+
+        x.filter_by(&y);
+        assert_eq!(x.solutions, vec![0]);
     }
 }
