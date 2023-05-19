@@ -114,6 +114,11 @@ impl BfBlock {
         diff
     }
 
+    pub fn just_one_solution(&mut self, i: usize) {
+        let x = self.solutions[i];
+        self.solutions = vec![x];
+    }
+
     pub fn common_links(xs: &BfBlock, ys: &BfBlock) -> Vec<Link> {
         let mut res = Vec::new();
         for x in &xs.links {
