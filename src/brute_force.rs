@@ -3,6 +3,7 @@ use std::fmt;
 
 use crate::triples::*;
 
+#[derive(Clone)]
 pub struct BfBlock {
     links: Vec<Link>,
     masks: Vec<u64>,

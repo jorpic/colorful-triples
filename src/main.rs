@@ -111,19 +111,21 @@ fn experiment3() {
                 new_links.insert(l);
             }
         }
-        for l in root_links {
+        for l in &root_links {
             new_links.remove(&l);
         }
         println!("found {} layer-{} links", new_links.len(), layer);
+        println!("Selecting 2_2 blocks of size (15,30)");
         add_blocks(&new_links, &links, &mut triples_set, &mut blocks);
 
+        println!("Link coverage: {}", root_links.union(&new_links).count());
         root_links = new_links;
     }
 
-    // /// Merge
+    // /// Pairwise block filtering
     loop {
-        println!("Join blocks");
-        let res = join_blocks(&mut blocks);
+        println!("Filter blocks");
+        let res = filter_blocks(&mut blocks);
         if res == 0 {
             break;
         } else {
@@ -131,15 +133,61 @@ fn experiment3() {
         }
     }
 
-    for b in &mut blocks {
-        if b.len() == 17 {
-            b.just_one_solution(6);
+    let (pivot, other_blocks): (_, Vec<_>) = {
+        let (xs, y_ys) = blocks.split_at_mut(5);
+        let (y, ys) = y_ys.split_at_mut(1);
+        (&mut y[0], xs.iter().chain(ys.iter()).cloned().collect())
+    };
+
+    assert_eq!(pivot.len(), 17);
+    println!("Join with pivot");
+    let mut blocks: Vec<BfBlock> = Vec::new();
+    for b in other_blocks {
+        let common_links = BfBlock::common_links(pivot, &b).len();
+        if common_links > 5 {
+            let bb = BfBlock::join(pivot, &b);
+            println!("{} {}", b, bb);
+            blocks.push(bb);
+        } else {
+            blocks.push(b);
         }
     }
 
+    // /// Pairwise block filtering
     loop {
-        println!("Join blocks");
-        let res = join_blocks(&mut blocks);
+        println!("Filter blocks");
+        let res = filter_blocks(&mut blocks);
+        if res == 0 {
+            break;
+        } else {
+            println!("deleted {} partial solutions", res);
+        }
+    }
+
+    let (pivot, other_blocks): (_, Vec<_>) = {
+        let (xs, y_ys) = blocks.split_at_mut(0);
+        let (y, ys) = y_ys.split_at_mut(1);
+        (&mut y[0], xs.iter().chain(ys.iter()).cloned().collect())
+    };
+
+    assert_eq!(pivot.len(), 17);
+    println!("Join with pivot");
+    let mut blocks: Vec<BfBlock> = Vec::new();
+    for b in other_blocks {
+        let common_links = BfBlock::common_links(pivot, &b).len();
+        if common_links > 5 {
+            let bb = BfBlock::join(pivot, &b);
+            println!("{} {}", b, bb);
+            blocks.push(bb);
+        } else {
+            blocks.push(b);
+        }
+    }
+
+    // /// Pairwise block filtering
+    loop {
+        println!("Filter blocks");
+        let res = filter_blocks(&mut blocks);
         if res == 0 {
             break;
         } else {
@@ -166,7 +214,7 @@ fn add_blocks(
     }
 }
 
-fn join_blocks(blocks: &mut Vec<BfBlock>) -> usize {
+fn filter_blocks(blocks: &mut Vec<BfBlock>) -> usize {
     let mut deleted = 0;
 
     for i in 0..blocks.len() {
@@ -178,8 +226,13 @@ fn join_blocks(blocks: &mut Vec<BfBlock>) -> usize {
 
         println!("{}", ba);
         for bb in other_blocks {
-            if BfBlock::common_links(ba, bb).len() > 5 {
-                deleted += ba.filter_by(bb);
+            let common_links = BfBlock::common_links(ba, bb).len();
+            if common_links > 5 {
+                let res = ba.filter_by(bb);
+                if res > 0 {
+                    deleted += res;
+                    println!("{}: common_links={} deleted={}", ba, common_links, res);
+                }
             }
         }
     }
