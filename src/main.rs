@@ -104,7 +104,7 @@ fn experiment3() {
     println!("found {} root links", root_links.len());
     add_blocks(&root_links, &links, &mut triples_set, &mut blocks);
 
-    for layer in 1..3 {
+    for layer in 1..2 {
         let mut new_links = BTreeSet::new();
         for t in &triples_set {
             for l in t.link_set() {
@@ -121,6 +121,22 @@ fn experiment3() {
     }
 
     // /// Merge
+    loop {
+        println!("Join blocks");
+        let res = join_blocks(&mut blocks);
+        if res == 0 {
+            break;
+        } else {
+            println!("deleted {} partial solutions", res);
+        }
+    }
+
+    for b in &mut blocks {
+        if b.len() == 17 {
+            b.just_one_solution(6);
+        }
+    }
+
     loop {
         println!("Join blocks");
         let res = join_blocks(&mut blocks);
