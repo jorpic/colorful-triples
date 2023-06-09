@@ -7,7 +7,7 @@ use crate::triples::*;
 pub struct BfBlock {
     links: Vec<Link>,
     masks: Vec<u64>,
-    solutions: Vec<u64>
+    pub solutions: Vec<u64>
 }
 
 impl fmt::Display for BfBlock {
@@ -56,7 +56,9 @@ impl BfBlock {
         let n = self.links.len() as u64;
         for i in 0..n {
             for j in i+1..n {
-                pairs.push((1 << i) | (1 << j));
+                for k in j+1..n {
+                    pairs.push((1 << i) | (1 << j) | (1 << k));
+                }
             }
         }
 
@@ -71,9 +73,10 @@ impl BfBlock {
             }
         }
 
-        for s in res {
-            if s.len() < 4 {
-                println!("{:?}", s);
+        for i in 0..res.len() {
+            let s = &res[i];
+            if s.len() < 8 {
+                println!("{:#012b}, {:?}", pairs[i], s);
             }
         }
     }

@@ -15,7 +15,7 @@ const N: u64 = 7825;
 
 fn main() {
     // experiment1();
-    // experiment2();
+    experiment2();
     experiment3();
 }
 
@@ -69,7 +69,7 @@ fn experiment2() {
     let py = Triples::pythagorean(N).filter_by_link_weight(2);
     let links = py.links_map();
 
-    let blocks_2 = get_neighbors(&links, 2, 2, 27);
+    let blocks_2 = get_neighbors(&links, 2, 2, 9);
     for b in blocks_2.iter().take(2) {
         let xxx = BfBlock::new(&b);
         println!("{}", xxx);
