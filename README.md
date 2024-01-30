@@ -1,1 +1,1 @@
-# colorful-pythagorean-triples
+# Colorful Triples
