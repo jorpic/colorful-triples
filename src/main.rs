@@ -19,36 +19,18 @@ fn main() {
     subs.dedup();
 
     println!("3,3 tight subgraphs: {}", subs.len());
-
-    let mut s27 = subs
-        .into_iter()
-        .filter(|s| 20 < s.0 && s.0 <= 32)
-        .rev()
-        .collect::<Vec<_>>();
-
-    println!("subgraphs in s27: {}", s27.len());
-
-    let mut used_triples: BTreeSet<Triple> = BTreeSet::new();
-    for s in &s27 {
-        for t in &s.2 {
-            used_triples.insert(*t);
-        }
-    }
-
-    println!("unique triples in s27: {}", used_triples.len());
+    let s27 = subs.into_iter().filter(|s| 20 < s.0 && s.0 <= 32).rev();
 
     let subs = all_subgraphs(&triples, 3)
-        .iter()
-        .map(|s| drop_weak_links(s, 2))
+        .into_iter()
+        .map(|s| drop_weak_links(&s, 2))
         .filter(|s| s.len() > 0)
-        .map(|s| (links(&s).len(), s.len(), s))
-        .collect::<Vec<_>>();
-    // subs.sort();
-    // subs.dedup(); // we don't need this because triples are used only once
+        .map(|s| (links(&s).len(), s.len(), s));
 
-    println!("4,2 tight subgraphs: {}", subs.len());
-
+    let subs = s27.chain(subs).collect::<Vec<_>>();
+    let mut used_triples: BTreeSet<Triple> = BTreeSet::new();
     let mut res = Vec::new();
+
     for (_lns, _tps, sub) in subs {
         let new_sub = sub
             .iter()
@@ -64,7 +46,6 @@ fn main() {
         }
 
         if new_lns - new_tps <= new_tps {
-            // println!("\t>> {} links, {} triples", new_lns, new_tps);
             for t in &new_sub {
                 used_triples.insert(*t);
             }
@@ -72,14 +53,15 @@ fn main() {
         }
     }
 
+    // FIXME: extend small subs with unused triples
+
     println!(
-        "with {} extra subgraphs we cover {} unique triples",
+        "with {} subgraphs we cover {} unique triples",
         res.len(),
         used_triples.len()
     );
 
     res.sort();
-    res.append(&mut s27);
 
     for a in &res {
         let a_lns = links(&a.2);
