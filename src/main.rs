@@ -20,9 +20,10 @@ fn main() {
 
     println!("3,3 tight subgraphs: {}", subs.len());
 
-    let s27 = subs
-        .iter()
+    let mut s27 = subs
+        .into_iter()
         .filter(|s| 20 < s.0 && s.0 <= 32)
+        .rev()
         .collect::<Vec<_>>();
 
     println!("subgraphs in s27: {}", s27.len());
@@ -77,9 +78,23 @@ fn main() {
         used_triples.len()
     );
 
-    for s in res {
-        print!("lns={}, tps={}", s.0, s.1);
-        println!(", sol={:>10}", brute_force(&s.2));
+    res.sort();
+    res.append(&mut s27);
+
+    for a in &res {
+        let a_lns = links(&a.2);
+        print!("\n{:?}", (a.0, a.1));
+        for b in &res {
+            let b_lns = links(&b.2);
+            let xx = b_lns.intersection(&a_lns).count();
+            if xx > 5 {
+                print!("{:>2}", xx);
+            } else {
+                print!("  ");
+            }
+        }
+        // print!("lns={}, tps={}", s.0, s.1);
+        // println!(", sol={:>10}", brute_force(&s.2));
     }
 }
 
