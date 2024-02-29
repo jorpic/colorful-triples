@@ -8,6 +8,7 @@ use brute_force::*;
 
 fn main() {
     let triples = pythagorean_triples(7825);
+    let triples = drop_weak_links(&triples, 2); // drop pendants
 
     let mut subs = all_subgraphs(&triples, 3)
         .iter()
@@ -49,6 +50,10 @@ fn main() {
             for t in &new_sub {
                 used_triples.insert(*t);
             }
+            let drop1 = brute_force_selected(&new_sub, 0b0100_0001_0010_0100_0101_0010u64);
+            let drop2 = brute_force_selected(&new_sub, 0b0001_0010_1100_1000_0010_0100u64);
+            let drop3 = brute_force_selected(&new_sub, 0b1010_0100_0001_0010_1000_1000u64);
+            println!("{new_lns} {new_tps} {drop1} {drop2} {drop3}");
             res.push((new_lns, new_tps, new_sub));
         }
     }
@@ -61,23 +66,24 @@ fn main() {
         used_triples.len()
     );
 
-    res.sort();
+    // res.sort();
 
-    for a in &res {
-        let a_lns = links(&a.2);
-        print!("\n{:?}", (a.0, a.1));
-        for b in &res {
-            let b_lns = links(&b.2);
-            let xx = b_lns.intersection(&a_lns).count();
-            if xx > 5 {
-                print!("{:>2}", xx);
-            } else {
-                print!("  ");
-            }
-        }
-        // print!("lns={}, tps={}", s.0, s.1);
-        // println!(", sol={:>10}", brute_force(&s.2));
-    }
+    // for a in &res {
+    //     let a_lns = links(&a.2);
+    //     print!("\n{:?}", (a.0, a.1));
+    //     for b in &res {
+    //         let b_lns = links(&b.2);
+    //         let xx = b_lns.intersection(&a_lns).count();
+    //         if xx > 5 {
+    //             // TODO: calculate joined table size
+    //             print!("{:>2}", xx);
+    //         } else {
+    //             print!("  ");
+    //         }
+    //     }
+    //     // print!("lns={}, tps={}", s.0, s.1);
+    //     // println!(", sol={:>10}", brute_force(&s.2));
+    // }
 }
 
 fn to_string(triples: &[Triple]) -> String {
