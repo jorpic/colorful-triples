@@ -1,3 +1,8 @@
 # Added by cargo
-
 /target
+
+# Added by Observable Framework
+dist/
+docs/.observablehq/cache/
+node_modules/
+yarn-error.log
