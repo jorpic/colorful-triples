@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::collections::VecDeque;
 
 mod triples;
 use triples::*;
@@ -6,9 +7,29 @@ use triples::*;
 mod brute_force;
 use brute_force::*;
 
-fn main() {
-    let triples = pythagorean_triples(7825);
-    let triples = drop_weak_links(&triples, 2); // drop pendants
+fn main() -> anyhow::Result<()> {
+    let mut program: VecDeque<String> =  std::env::args().collect();
+    program.pop_front(); // drop program name
+
+    let triples = match program.pop_front().as_deref() {
+        Some("triples") => pythagorean_triples(7825),
+        Some(cmd) => panic!("Unexpected command: {}", cmd),
+        None => return Ok(()),
+    };
+
+    let triples = match program.pop_front().as_deref() {
+        Some("drop_pendants") => drop_weak_links(&triples, 2),
+        Some(cmd) => panic!("Unexpected command: {}", cmd),
+        None => triples,
+    };
+
+    match program.pop_front().as_deref() {
+        Some("to_json") => serde_json::to_writer(std::io::stdout(), &triples)?,
+        Some(cmd) => panic!("Unexpected command: {}", cmd),
+        None => {},
+    };
+
+    return Ok(());
 
     let mut subs = all_subgraphs(&triples, 3)
         .iter()

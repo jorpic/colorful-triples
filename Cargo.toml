@@ -4,7 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+anyhow = "1.0.81"
 bitintr = "0.3.0"
+serde_json = "1.0.115"
 
 [profile.release]
 debug = true
