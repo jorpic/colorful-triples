@@ -19,11 +19,12 @@ export function triplesToGraph(triples) {
 }
 
 export function lineLayout(graph) {
-  const w = 800;
+  const w = 600;
   const h = 400;
+  const r = 4;
 
   const xScale = d3.scalePoint()
-    .range([10, w-10])
+    .range([r, w-r])
     .domain(graph.nodes.map(n => n.id));
 
   const svg = d3.create("svg")
@@ -38,12 +39,12 @@ export function lineLayout(graph) {
         const startX = xScale(e.source);
         const endX = xScale(e.target);
         return [
-          'M', startX, h-10,
+          'M', startX, h-r,
           'A',
           (startX - endX)/2, ',',
           (startX - endX)/2, 0, 0, ',',
           1,
-          endX, ',', h-10]
+          endX, ',', h-r]
         .join(' ');
     })
     .style("fill", "none")
@@ -54,16 +55,16 @@ export function lineLayout(graph) {
     .data(graph.nodes)
     .join("circle")
       .attr("cx", n => xScale(n.id))
-      .attr("cy", h-10)
-      .attr("r", 8)
+      .attr("cy", h-r)
+      .attr("r", r)
       .style("fill", "green");
 
   return svg.node();
 }
 
 export function forceLayout(graph) {
-  const w = 1000;
-  const h = 1000;
+  const w = 600;
+  const h = 800;
 
   const svg = d3.create("svg")
       .attr("width", w)

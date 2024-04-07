@@ -52,6 +52,10 @@ const i = view(Inputs.range([0, schemas.length-1], {value:0, step: 1}));
 const s = schemas[i];
 const g = triplesToGraph(s);
 display({links: linkSet(s), triples: s});
-// display(lineLayout(g));
-display(forceLayout(g));
 ```
+
+<div style="display: flex;">
+ <div style="flex-basis:50%">${display(forceLayout(g))}</div>
+
+ <div style="flex-basis:50%">${display(lineLayout(g))} </div>
+</div>
