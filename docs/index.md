@@ -6,24 +6,38 @@ toc: true
 # Stats
 
 ```js
-const hg = FileAttachment("data/hypergraph.json").json();
 const triples = FileAttachment("data/triples.json").json();
+const tight_3_3 = FileAttachment("data/tight_3_3.json").json();
+const tight_3_2 = FileAttachment("data/tight_3_2.json").json();
 ```
 
 ```js
 display(triples);
 ```
 
-Our hypergraph consists of:
-- **${hg.nodes.length}** nodes
-- **${Object.keys(hg.edges).length}** hyperedges
-
 ```js
-display(hg.tightGroups)
+function linkSet(nodes) {
+  const ls = new Set();
+  nodes.forEach(n => n.forEach(l => ls.add(l)));
+  return ls;
+}
+
+function groupToNormalForm(grp) {
+  let links = [...new Set(grp.flatMap(t => t))].map(l => Number(l)).sort((a,b) => a - b);
+  // `revLinks` is a monotinic mapping.
+  let revLinks = links.reduce((map, l, ix) => { map[l] = ix; return map; }, {});
+  let schema = grp.map(t => t.map(l => revLinks[l]));
+  return {links, schema};
+}
+
+const schemas = [...new Set(
+  tight_3_3.map(g => JSON.stringify(groupToNormalForm(g).schema)))]
+    .map(JSON.parse)
+    .sort((a, b) => a.length - b.length);
 ```
 
 ```js
-display(hg.schemas)
+display(schemas)
 ```
 
 ```js
@@ -31,13 +45,13 @@ import {triplesToGraph, lineLayout, forceLayout} from "./graphDrawing.js";
 ```
 
 ```js
-const i = view(Inputs.range([0, hg.schemas.length-1], {step: 1}));
+const i = view(Inputs.range([0, schemas.length-1], {value:0, step: 1}));
 ```
 
 ```js
-const s = hg.schemas[i];
+const s = schemas[i];
 const g = triplesToGraph(s);
-display(g);
-display(lineLayout(g));
+display({links: linkSet(s), triples: s});
+// display(lineLayout(g));
 display(forceLayout(g));
 ```

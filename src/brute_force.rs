@@ -6,7 +6,7 @@ pub fn brute_force(triples: &[Triple]) -> usize {
     for t in triples {
         let mut mask: u64 = 0;
         for l in t {
-            let i = links.binary_search(&l).unwrap();
+            let i = links.binary_search(l).unwrap();
             mask |= 1 << i;
         }
         masks.push(mask);
@@ -18,7 +18,7 @@ pub fn brute_force(triples: &[Triple]) -> usize {
     for x in 0..n {
         if masks.iter().all(|m| x & m != *m && x & m != 0) {
             // solutions.push(x);
-            solutions = solutions + 1;
+            solutions += 1;
         }
     }
 
@@ -34,7 +34,7 @@ pub fn brute_force_selected(triples: &[Triple], selected_links: u64) -> usize {
     for t in triples {
         let mut mask: u64 = 0;
         for l in t {
-            let i = links.binary_search(&l).unwrap();
+            let i = links.binary_search(l).unwrap();
             mask |= 1 << i;
         }
         masks.push(mask);

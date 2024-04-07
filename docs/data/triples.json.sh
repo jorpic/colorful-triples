@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 
-cargo run -- triples drop_pendants to_json
+cargo run --release -- triples drop_pendants

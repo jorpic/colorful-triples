@@ -21,8 +21,8 @@ pub fn pythagorean_triples(n: u64) -> Vec<Triple> {
 }
 
 fn inc_key(map: &mut BTreeMap<Link, usize>, k: &Link) {
-    if let Some(x) = map.get_mut(&k) {
-        *x = *x + 1;
+    if let Some(x) = map.get_mut(k) {
+        *x += 1;
     } else {
         map.insert(*k, 1);
     }
@@ -42,7 +42,7 @@ pub fn links(triples: &[Triple]) -> BTreeSet<Link> {
 pub fn link_weights(triples: &[Triple]) -> BTreeMap<Link, usize> {
     let mut res = BTreeMap::new();
     for t in triples {
-        t.iter().for_each(|l| inc_key(&mut res, &l));
+        t.iter().for_each(|l| inc_key(&mut res, l));
     }
     res
 }
@@ -51,7 +51,7 @@ fn link_index(triples: &[Triple]) -> BTreeMap<Link, Vec<Triple>> {
     let mut res = BTreeMap::<Link, Vec<Triple>>::new();
     for t in triples {
         t.iter().for_each(|l| {
-            if let Some(x) = res.get_mut(&l) {
+            if let Some(x) = res.get_mut(l) {
                 x.push(*t);
             } else {
                 res.insert(*l, vec![*t]);
@@ -66,10 +66,9 @@ pub fn drop_weak_links(triples: &[Triple], min_weight: usize) -> Vec<Triple> {
     loop {
         let lw = link_weights(&ts);
         let prev_len = ts.len();
-        ts = ts.into_iter()
-            .filter(
-                |t| t.iter().all(|l| lw.get(&l).unwrap() >= &min_weight)
-            ).collect();
+        ts.retain(
+            |t| t.iter().all(|l| lw.get(l).unwrap() >= &min_weight)
+        );
 
         if ts.len() == prev_len {
             break;
@@ -91,7 +90,7 @@ pub fn all_subgraphs(triples: &[Triple], depth: usize) -> Vec<Graph> {
 
         for _d in 0..depth {
             for l in &prev_links {
-                for t in link_ix.get(&l).unwrap() {
+                for t in link_ix.get(l).unwrap() {
                     if subgraph_triples.insert(*t) {
                         t.iter().for_each(|nl| {
                             let is_new_link = l != &nl
@@ -113,6 +112,19 @@ pub fn all_subgraphs(triples: &[Triple], depth: usize) -> Vec<Graph> {
     }
     res
 }
+
+pub fn get_tight_subgraphs(g: &Graph, depth: usize, weight: usize) -> Vec<Graph> {
+    let mut subs = all_subgraphs(g, depth)
+        .into_iter()
+        .map(|s| drop_weak_links(&s, weight))
+        .filter(|s| !s.is_empty())
+        .map(|s| (links(&s).len(), s.len(), s))
+        .collect::<Vec<_>>();
+    subs.sort();
+    subs.dedup();
+    subs.into_iter().map(|s| s.2).collect::<Vec<_>>()
+}
+
 
 
 #[cfg(test)]

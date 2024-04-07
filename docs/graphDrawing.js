@@ -62,8 +62,8 @@ export function lineLayout(graph) {
 }
 
 export function forceLayout(graph) {
-  const w = 800;
-  const h = 800;
+  const w = 1000;
+  const h = 1000;
 
   const svg = d3.create("svg")
       .attr("width", w)
@@ -72,10 +72,10 @@ export function forceLayout(graph) {
   const force = d3
     .forceSimulation(graph.nodes)
     .force("link",
-      d3.forceLink().links(graph.edges).distance(50))
+      d3.forceLink().links(graph.edges).distance(25))
     .force(
       "charge",
-      d3.forceManyBody().strength(-600)
+      d3.forceManyBody().strength(-300)
     )
     .force("x", d3.forceX(w / 2))
     .force("y", d3.forceY(h / 2));
@@ -97,7 +97,7 @@ export function forceLayout(graph) {
       .attr("fill", "green")
       .attr("cx", c => c.x)
       .attr("cy", c => c.y)
-      .attr("r", c => 10);
+      .attr("r", c => 4);
 
   return svg.node();
 }
