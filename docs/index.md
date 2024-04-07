@@ -7,6 +7,11 @@ toc: true
 
 ```js
 const hg = FileAttachment("data/hypergraph.json").json();
+const triples = FileAttachment("data/triples.json").json();
+```
+
+```js
+display(triples);
 ```
 
 Our hypergraph consists of:
