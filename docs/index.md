@@ -12,9 +12,7 @@ const tight_3_3 = FileAttachment("data/tight_3_3.json").json();
 const tight_3_2 = FileAttachment("data/tight_3_2.json").json();
 
 function linkSet(nodes) {
-  const ls = new Set();
-  nodes.forEach(n => n.forEach(l => ls.add(l)));
-  return ls;
+  return new Set(nodes.flat());
 }
 
 function groupByEdges(ts) {
@@ -47,8 +45,8 @@ display(tight_3_3);
 
 const best = tight_3_3
     .map(s => [linkSet(s).size, s.length, s])
-    .filter(s => 27 <= s[0] && s[0] <= 44)
-    .sort((a,b) => -b[1] + a[1])
+    .filter(s => 9 <= s[0] && s[0] <= 44)
+    .sort((a,b) => a[1] - b[1])
     .map(s => s[2]);
 
 display(best);
@@ -57,8 +55,8 @@ const usedTriples = new Set();
 const subs = [];
 for(let x of best.concat(tight_3_3)) {
     let y = x.filter(t => !usedTriples.has(JSON.stringify(t)));
-    y = filterByLinkWeight(y, {minWeight: 2});
-    if (y.length >= 20) {
+    y = filterByLinkWeight(y, {minWeight: 3});
+    if (y.length > 0) {
         subs.push([x, y]);
         for(let t of y) {
             usedTriples.add(JSON.stringify(t));
@@ -85,3 +83,33 @@ display({links: linkSet(s[1]), triples: s[1]});
  <div style="flex-basis:50%">${display(forceLayout(a))}</div>
  <div style="flex-basis:50%">${display(forceLayout(b))}</div>
 </div>
+
+
+
+
+```js
+const data = [];
+for(let i = 0; i < subs.length; i++) {
+    const a = linkSet(subs[i][1]);
+    for(let j = 0; j < subs.length; j++) {
+        const b = linkSet(subs[j][1]);
+        let val = 0;
+        for(let x of b) {
+            val += a.has(x) ? 1 : 0;
+        }
+        data.push({x:i, y:j, val});
+    }
+}
+
+display(Plot.plot({
+    width: 900,
+    x: {axis: null},
+    y: {axis: null},
+    tooltip: {fill: "coral", stroke: "coral"},
+    color: {scheme: "YlGn"},
+    marks: [
+      Plot.cell(data, {x: "x", y: "y", fill: "val"}),
+      Plot.text(data, {x: "x", y: "y", text: "val", title: d => `${d.x}:${d.y} = ${d.val}`}),
+    ]
+}));
+```
