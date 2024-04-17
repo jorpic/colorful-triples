@@ -6,38 +6,10 @@ toc: true
 # Stats
 
 ```js
+import {linkSet, groupByEdges, filterByLinkWeight} from "./graphLib.js";
 import {triplesToGraph, lineLayout, forceLayout} from "./graphDrawing.js";
 
 const tight_3_3 = FileAttachment("data/tight_3_3.json").json();
-const tight_3_2 = FileAttachment("data/tight_3_2.json").json();
-
-function linkSet(nodes) {
-  return new Set(nodes.flat());
-}
-
-function groupByEdges(ts) {
-  const ls = {};
-  ts.forEach(xs =>
-    xs.map(x => {
-      if (x in ls) { ls[x].push(xs); } else { ls[x] = [xs]; }
-    })
-  );
-  return ls;
-}
-
-function filterByLinkWeight(ts, {minWeight}) {
-  ts = new Set(ts);
-  while(true) {
-    let deleted = 0;
-    Object.values(groupByEdges(ts)).forEach(xs => {
-      if (xs.length < minWeight) {
-        xs.forEach(x => ts.delete(x));
-        deleted += 1;
-      }
-    });
-    if (deleted == 0) return [...ts];
-  }
-}
 ```
 
 ```js
@@ -83,9 +55,6 @@ display({links: linkSet(s[1]), triples: s[1]});
  <div style="flex-basis:50%">${display(forceLayout(a))}</div>
  <div style="flex-basis:50%">${display(forceLayout(b))}</div>
 </div>
-
-
-
 
 ```js
 const data = [];
