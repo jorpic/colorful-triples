@@ -1,37 +1,56 @@
-use std::collections::btree_map;
+use std::collections::{btree_map, btree_set};
 use std::collections::{BTreeSet, BTreeMap, HashMap};
+use serde::Serialize;
+
 
 pub type Edge = u16;
 pub type Triple = [Edge; 3];
 
 pub trait Node {
-    type Iter<'a>: IntoIterator<Item = Edge> where Self: 'a;
-    fn edges(&self) -> Self::Iter<'_>;
+    type IterEdges<'a>: IntoIterator<Item = Edge> where Self: 'a;
+    type IterTriples<'a>: IntoIterator<Item = Triple> where Self: 'a;
+
+    /// Iterates hyperedges in ascending order of their Id.
+    fn edges(&self) -> Self::IterEdges<'_>;
+
+    /// Iterates triples in ascending order.
+    fn triples(&self) -> Self::IterTriples<'_>;
 }
 
 impl Node for Triple {
-    type Iter<'a> = Triple;
+    type IterEdges<'a> = Triple;
+    type IterTriples<'a> = [Triple; 1];
 
-    fn edges(&self) -> Self::Iter<'_> {
+    fn edges(&self) -> Self::IterEdges<'_> {
         *self
+    }
+
+    fn triples(&self) -> Self::IterTriples<'_> {
+        [*self; 1]
     }
 }
 
 
-#[derive(PartialEq, Eq, Clone, Default, Hash)]
+#[derive(Clone, Default, Hash)]
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Serialize)]
 pub struct Cluster {
     nodes: BTreeSet<Triple>,
     edge_weights: BTreeMap<Edge, usize>,
 }
 
 impl Node for Cluster {
-    type Iter<'a> =  std::iter::Cloned<btree_map::Keys<'a, Edge, usize>>;
+    type IterEdges<'a> =  std::iter::Cloned<btree_map::Keys<'a, Edge, usize>>;
+    type IterTriples<'a> =  std::iter::Cloned<btree_set::Iter<'a, Triple>>;
 
-    fn edges(&self) -> Self::Iter<'_> {
+    fn edges(&self) -> Self::IterEdges<'_> {
         self.edge_weights.keys().cloned()
     }
-}
 
+    fn triples(&self) -> Self::IterTriples<'_> {
+        self.nodes.iter().cloned()
+    }
+}
 
 type ClusterId = Triple;
 
@@ -40,9 +59,16 @@ impl Cluster {
         *self.nodes.first().unwrap()
     }
 
-    pub fn new_singleton(t: &Triple) -> Self {
+    pub fn singleton(t: &Triple) -> Self {
+        Cluster::from_triples([t])
+    }
+
+    pub fn from_triples<'a, T>(triples: T) -> Self
+        where
+            T: IntoIterator<Item = &'a Triple>
+    {
         let mut res = Cluster::default();
-        res.add_triples([t]);
+        res.add_triples(triples);
         res
     }
 
@@ -84,6 +110,63 @@ pub fn mk_edge_index<'a, N, I>(nodes: I) -> EdgeIx<&'a N>
     res
 }
 
+pub fn tight_neighborhoods(
+    edge_ix: &EdgeIx<Cluster>,
+    width: usize,
+    min_weight: usize
+    ) -> Vec<Cluster>
+{
+    let mut clusters = edge_ix.keys()
+        .map(|edge| edge_neighborhood(*edge, edge_ix, width))
+        .filter_map(|cluster| {
+            let triples: Vec<_> = cluster.triples().collect();
+            let triples = drop_weak_nodes(&triples, min_weight);
+            if triples.is_empty() {
+                None
+            } else {
+                Some(Cluster::from_triples(&triples))
+            }
+        })
+        .map(|c| (c.edges().count(), c.nodes.len(), c))
+        .collect::<Vec<_>>();
+
+    clusters.sort();
+    clusters.dedup();
+    clusters.into_iter().map(|s| s.2).collect()
+}
+
+
+fn edge_neighborhood(center: Edge, edge_ix: &EdgeIx<Cluster>, width: usize) -> Cluster {
+    let mut subgraph_nodes = BTreeSet::new();
+    let mut subgraph_edges = BTreeSet::new();
+    let mut prev_edges = BTreeSet::new();
+    prev_edges.insert(center);
+    let mut new_edges = BTreeSet::new();
+
+    for _w in 0..width {
+        for e in &prev_edges {
+            for n in edge_ix.get(e).unwrap() {
+                if subgraph_nodes.insert(n.clone()) {
+                    n.edges().into_iter().for_each(|new_edge| {
+                        let is_new_edge = e != &new_edge
+                            && !prev_edges.contains(&new_edge)
+                            && !subgraph_edges.contains(&new_edge);
+                        if is_new_edge {
+                            new_edges.insert(new_edge);
+                        }
+                    })
+                }
+            }
+        }
+
+        subgraph_edges.append(&mut prev_edges); // prev_edges is empty now
+        prev_edges.append(&mut new_edges); // new_edges is empty now
+    }
+
+    Cluster::from_triples(subgraph_nodes.iter().map(|n| &n.nodes).flatten())
+}
+
+
 // Weak node is a node that is connected to a weak edge.
 // Weak edge is an edge that connects < min_weight nodes.
 pub fn drop_weak_nodes<N: Node + Clone>(graph: &[N], min_weight: usize) -> Vec<N>
@@ -109,10 +192,10 @@ pub fn drop_weak_nodes<N: Node + Clone>(graph: &[N], min_weight: usize) -> Vec<N
     res
 }
 
-pub fn join_weak_edges(mut clusters: &[Cluster], min_weight: usize, max_width: usize) -> Vec<Cluster> {
+pub fn join_weak_nodes(mut clusters: &[Cluster], min_weight: usize, max_width: usize) -> Vec<Cluster> {
     let mut clusters = clusters.to_vec();
     loop {
-        let new_clusters = join_weak_edges_single_pass(&clusters, min_weight, max_width);
+        let new_clusters = join_weak_nodes_single_pass(&clusters, min_weight, max_width);
         if new_clusters.len() == clusters.len() {
             return new_clusters;
         }
@@ -120,8 +203,7 @@ pub fn join_weak_edges(mut clusters: &[Cluster], min_weight: usize, max_width: u
     }
 }
 
-
-pub fn join_weak_edges_single_pass(
+fn join_weak_nodes_single_pass(
     clusters: &[Cluster],
     min_weight: usize,
     max_width: usize
@@ -168,7 +250,6 @@ pub fn join_weak_edges_single_pass(
 //  - no triples added or lost
 //  - sum of link weights in clusters should match global link weights
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -209,7 +290,7 @@ mod tests {
         let triples = pythagorean_triples(7825);
         let triples = drop_weak_nodes(&triples, 2);
         let singleton_clusters: Vec<_> = triples.iter()
-            .map(Cluster::new_singleton)
+            .map(Cluster::singleton)
             .collect();
         let res = join_weak_edges(&singleton_clusters, 3, 42);
         let res = join_weak_edges(&res, 4, 42);

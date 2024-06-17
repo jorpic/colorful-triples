@@ -1,7 +1,12 @@
-use crate::triples::*;
+use std::collections::BTreeSet;
+use crate::hgraph::*;
+
+fn links(triples: &[Triple]) -> BTreeSet<Edge> {
+    triples.iter().flatten().cloned().collect()
+}
 
 pub fn brute_force(triples: &[Triple]) -> usize {
-    let links: Vec<Link> = links(triples).into_iter().collect();
+    let links: Vec<Edge> = links(triples).into_iter().collect();
     let mut masks = Vec::new();
     for t in triples {
         let mut mask: u64 = 0;
@@ -29,7 +34,7 @@ pub fn brute_force(triples: &[Triple]) -> usize {
 pub fn brute_force_selected(triples: &[Triple], selected_links: u64) -> usize {
     use bitintr::{Popcnt, Pext};
 
-    let links: Vec<Link> = links(triples).into_iter().collect();
+    let links: Vec<Edge> = links(triples).into_iter().collect();
     let mut masks = Vec::new();
     for t in triples {
         let mut mask: u64 = 0;
