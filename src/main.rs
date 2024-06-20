@@ -10,12 +10,9 @@ mod hgraph;
 use hgraph::*;
 
 fn main() -> anyhow::Result<()> {
-
     let triples = pythagorean_triples(7825);
 
-    let hgraph: Vec<_> = triples.iter()
-        .map(Cluster::singleton)
-        .collect();
+    let hgraph: Vec<_> = triples.iter().map(Cluster::singleton).collect();
 
     let hgraph = drop_weak_nodes(&hgraph, 2);
     let hgraph = join_weak_nodes(&hgraph, 3, 42);
