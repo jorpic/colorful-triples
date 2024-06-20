@@ -1,6 +1,6 @@
 use serde::Serialize;
 use std::collections::{btree_map, btree_set};
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 
 pub type Edge = u16;
 pub type Triple = [Edge; 3];
@@ -147,7 +147,7 @@ fn edge_neighborhood(center: Edge, edge_ix: &EdgeIx<Cluster>, width: usize) -> C
         for e in &prev_edges {
             for n in edge_ix.get(e).unwrap() {
                 if subgraph_nodes.insert(n.clone()) {
-                    n.edges().into_iter().for_each(|new_edge| {
+                    n.edges().for_each(|new_edge| {
                         let is_new_edge = e != &new_edge
                             && !prev_edges.contains(&new_edge)
                             && !subgraph_edges.contains(&new_edge);
@@ -163,7 +163,7 @@ fn edge_neighborhood(center: Edge, edge_ix: &EdgeIx<Cluster>, width: usize) -> C
         prev_edges.append(&mut new_edges); // new_edges is empty now
     }
 
-    Cluster::from_triples(subgraph_nodes.iter().map(|n| &n.nodes).flatten())
+    Cluster::from_triples(subgraph_nodes.iter().flat_map(|n| &n.nodes))
 }
 
 // Weak node is a node that is connected to a weak edge.
@@ -192,7 +192,7 @@ pub fn drop_weak_nodes<N: Node + Clone>(graph: &[N], min_weight: usize) -> Vec<N
 }
 
 pub fn join_weak_nodes(
-    mut clusters: &[Cluster],
+    clusters: &[Cluster],
     min_weight: usize,
     max_width: usize,
 ) -> Vec<Cluster> {
@@ -230,7 +230,7 @@ fn join_weak_nodes_single_pass(
         // No conflicts, safe to merge nodes.
         let mut new_cluster = Cluster::default();
         for c in adjacent_clusters {
-            new_cluster.merge_with(&c);
+            new_cluster.merge_with(c);
         }
         if new_cluster.edges().count() <= max_width {
             for c in adjacent_clusters {
