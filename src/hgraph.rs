@@ -35,8 +35,8 @@ impl Node for Triple {
 
 #[derive(Clone, Debug, Default, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub struct Cluster {
-    nodes: BTreeSet<Triple>,
-    edge_weights: BTreeMap<Edge, usize>,
+    pub nodes: BTreeSet<Triple>,
+    pub edge_weights: BTreeMap<Edge, usize>,
 }
 
 impl Node for Cluster {
