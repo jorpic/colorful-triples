@@ -33,7 +33,7 @@ impl Node for Triple {
     }
 }
 
-#[derive(Clone, Default, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[derive(Clone, Debug, Default, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub struct Cluster {
     nodes: BTreeSet<Triple>,
     edge_weights: BTreeMap<Edge, usize>,
@@ -111,32 +111,39 @@ where
     res
 }
 
-pub fn tight_neighborhoods(
-    edge_ix: &EdgeIx<Cluster>,
+pub fn mk_edge_weights<'a, N, I>(nodes: I) -> BTreeMap<Edge, usize>
+where
+    N: Node + 'a,
+    I: IntoIterator<Item = &'a N>,
+{
+    let mut res = BTreeMap::new();
+    for node in nodes {
+        for edge in node.edges() {
+            res.entry(edge).and_modify(|x| *x = &*x + 1).or_insert(1);
+        }
+    }
+    res
+}
+
+pub fn tight_neighborhoods<'a>(
+    edge_ix: &'a EdgeIx<&'a Cluster>,
     width: usize,
     min_weight: usize,
-) -> Vec<Cluster> {
-    let mut clusters = edge_ix
+) -> impl Iterator<Item = Cluster> + 'a {
+    edge_ix
         .keys()
-        .map(|edge| edge_neighborhood(*edge, edge_ix, width))
-        .filter_map(|cluster| {
-            let triples: Vec<_> = cluster.triples().collect();
-            let triples = drop_weak_nodes(&triples, min_weight);
+        .map(move |edge| edge_neighborhood(*edge, edge_ix, width))
+        .filter_map(move |cluster| {
+            let triples = drop_weak_nodes(cluster.triples(), min_weight);
             if triples.is_empty() {
                 None
             } else {
                 Some(Cluster::from_triples(&triples))
             }
         })
-        .map(|c| (c.edges().count(), c.nodes.len(), c))
-        .collect::<Vec<_>>();
-
-    clusters.sort();
-    clusters.dedup();
-    clusters.into_iter().map(|s| s.2).collect()
 }
 
-fn edge_neighborhood(center: Edge, edge_ix: &EdgeIx<Cluster>, width: usize) -> Cluster {
+pub fn edge_neighborhood(center: Edge, edge_ix: &EdgeIx<&Cluster>, width: usize) -> Cluster {
     let mut subgraph_nodes = BTreeSet::new();
     let mut subgraph_edges = BTreeSet::new();
     let mut prev_edges = BTreeSet::new();
@@ -146,7 +153,7 @@ fn edge_neighborhood(center: Edge, edge_ix: &EdgeIx<Cluster>, width: usize) -> C
     for _w in 0..width {
         for e in &prev_edges {
             for n in edge_ix.get(e).unwrap() {
-                if subgraph_nodes.insert(n.clone()) {
+                if subgraph_nodes.insert(n) {
                     n.edges().for_each(|new_edge| {
                         let is_new_edge = e != &new_edge
                             && !prev_edges.contains(&new_edge)
@@ -168,19 +175,19 @@ fn edge_neighborhood(center: Edge, edge_ix: &EdgeIx<Cluster>, width: usize) -> C
 
 // Weak node is a node that is connected to a weak edge.
 // Weak edge is an edge that connects < min_weight nodes.
-pub fn drop_weak_nodes<N: Node + Clone>(graph: &[N], min_weight: usize) -> Vec<N> {
-    let mut res = graph.to_vec();
+pub fn drop_weak_nodes<N, I>(graph: I, min_weight: usize) -> Vec<N>
+where
+    N: Node,
+    I: IntoIterator<Item = N>,
+{
+    let mut res: Vec<_> = graph.into_iter().collect();
     loop {
-        let edge_index: BTreeMap<_, _> = mk_edge_index(&res)
-            .into_iter()
-            .map(|(edge, nodes)| (edge, nodes.len()))
-            .collect();
-
+        let edge_weights = mk_edge_weights(&res);
         let prev_len = res.len();
         res.retain(|node| {
             node.edges()
                 .into_iter()
-                .all(|edge| edge_index.get(&edge).unwrap() >= &min_weight)
+                .all(|edge| edge_weights.get(&edge).unwrap() >= &min_weight)
         });
 
         if res.len() == prev_len {
@@ -191,11 +198,7 @@ pub fn drop_weak_nodes<N: Node + Clone>(graph: &[N], min_weight: usize) -> Vec<N
     res
 }
 
-pub fn join_weak_nodes(
-    clusters: &[Cluster],
-    min_weight: usize,
-    max_width: usize,
-) -> Vec<Cluster> {
+pub fn join_weak_nodes(clusters: &[Cluster], min_weight: usize, max_width: usize) -> Vec<Cluster> {
     let mut clusters = clusters.to_vec();
     loop {
         let new_clusters = join_weak_nodes_single_pass(&clusters, min_weight, max_width);
