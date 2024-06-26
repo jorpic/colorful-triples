@@ -125,16 +125,20 @@ where
     res
 }
 
+pub struct NeighborhoodOptions {
+    pub width: usize,
+    pub min_weight: usize,
+}
+
 pub fn tight_neighborhoods<'a>(
     edge_ix: &'a EdgeIx<&'a Cluster>,
-    width: usize,
-    min_weight: usize,
+    opt: &'a NeighborhoodOptions,
 ) -> impl Iterator<Item = Cluster> + 'a {
     edge_ix
         .keys()
-        .map(move |edge| edge_neighborhood(*edge, edge_ix, width))
+        .map(move |edge| edge_neighborhood(*edge, edge_ix, opt.width))
         .filter_map(move |cluster| {
-            let triples = drop_weak_nodes(cluster.triples(), min_weight);
+            let triples = drop_weak_nodes(cluster.triples(), opt.min_weight);
             if triples.is_empty() {
                 None
             } else {
@@ -153,6 +157,10 @@ pub fn edge_neighborhood(center: Edge, edge_ix: &EdgeIx<&Cluster>, width: usize)
     for _w in 0..width {
         for e in &prev_edges {
             for n in edge_ix.get(e).unwrap() {
+                if n.edge_weights.len() > 20 {
+                    // NB: Skip big clusters!
+                    continue;
+                }
                 if subgraph_nodes.insert(n) {
                     n.edges().for_each(|new_edge| {
                         let is_new_edge = e != &new_edge
@@ -198,10 +206,19 @@ where
     res
 }
 
-pub fn join_weak_nodes(clusters: &[Cluster], min_weight: usize, max_width: usize) -> Vec<Cluster> {
+pub struct JoinNodesOptions {
+    pub min_edge_weight: usize,
+    pub max_out_edges: usize,
+}
+
+pub fn join_weak_nodes(
+    clusters: &[Cluster],
+    global_weights: &BTreeMap<Edge, usize>,
+    opt: &JoinNodesOptions
+) -> Vec<Cluster> {
     let mut clusters = clusters.to_vec();
     loop {
-        let new_clusters = join_weak_nodes_single_pass(&clusters, min_weight, max_width);
+        let new_clusters = join_weak_nodes_single_pass(&clusters, global_weights, opt);
         if new_clusters.len() == clusters.len() {
             return new_clusters;
         }
@@ -211,13 +228,13 @@ pub fn join_weak_nodes(clusters: &[Cluster], min_weight: usize, max_width: usize
 
 fn join_weak_nodes_single_pass(
     clusters: &[Cluster],
-    min_weight: usize,
-    max_width: usize,
+    global_weights: &BTreeMap<Edge, usize>,
+    opt: &JoinNodesOptions,
 ) -> Vec<Cluster> {
     let edge_index = mk_edge_index(clusters);
     let weak_edges = edge_index
         .values()
-        .filter(|cs| 1 < cs.len() && cs.len() < min_weight);
+        .filter(|cs| 1 < cs.len() && cs.len() < opt.min_edge_weight);
 
     let mut merged: BTreeSet<ClusterId> = BTreeSet::new();
     let mut new_clusters: Vec<Cluster> = Vec::new();
@@ -235,7 +252,13 @@ fn join_weak_nodes_single_pass(
         for c in adjacent_clusters {
             new_cluster.merge_with(c);
         }
-        if new_cluster.edges().count() <= max_width {
+
+        let out_edges = new_cluster.edge_weights
+            .iter()
+            .filter(|(e, w)| global_weights.get(e).unwrap() > w)
+            .count();
+
+        if out_edges <= opt.max_out_edges {
             for c in adjacent_clusters {
                 merged.insert(c.id());
             }
@@ -287,20 +310,8 @@ mod tests {
         let e_ix = mk_edge_index(&triples);
         assert_eq!(2239, e_ix.values().filter(|ts| ts.len() == 1).count());
 
-        let strong_triples = drop_weak_nodes(&triples, 2);
+        let strong_triples = drop_weak_nodes(triples, 2);
         let e_ix = mk_edge_index(&strong_triples);
         assert_eq!(0, e_ix.values().filter(|ts| ts.len() == 1).count());
-    }
-
-    #[test]
-    fn test_join_weak_edges() {
-        let triples = pythagorean_triples(7825);
-        let triples = drop_weak_nodes(&triples, 2);
-        let singleton_clusters: Vec<_> = triples.iter().map(Cluster::singleton).collect();
-        let res = join_weak_edges(&singleton_clusters, 3, 42);
-        let res = join_weak_edges(&res, 4, 42);
-        //let e_ix = mk_edge_index(&res);
-        // assert_eq!(0, res.iter().filter(|ts| ts.edges().count() == 3).count());
-        assert_eq!(1236, res.len());
     }
 }

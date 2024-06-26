@@ -9,76 +9,43 @@ toc: true
 import {linkSet, groupByEdges, filterByLinkWeight} from "./graphLib.js";
 import {triplesToGraph, lineLayout, forceLayout} from "./graphDrawing.js";
 
-const tight_3_3 = FileAttachment("data/tight_3_3.json").json();
+const clusters = FileAttachment("data/clusters.json").json();
 ```
 
 ```js
-display(tight_3_3);
+display(clusters);
 
-const best = tight_3_3
-    .map(s => [linkSet(s).size, s.length, s])
-    .filter(s => 9 <= s[0] && s[0] <= 44)
-    .sort((a,b) => a[1] - b[1])
-    .map(s => s[2]);
-
-display(best);
-
-const usedTriples = new Set();
-const subs = [];
-for(let x of best.concat(tight_3_3)) {
-    let y = x.filter(t => !usedTriples.has(JSON.stringify(t)));
-    y = filterByLinkWeight(y, {minWeight: 3});
-    if (y.length > 0) {
-        subs.push([x, y]);
-        for(let t of y) {
-            usedTriples.add(JSON.stringify(t));
-        }
+function mkGraph(nodes) {
+  let edges = [];
+  for(let i = 0; i < nodes.length; i++) {
+    const a = nodes[i];
+    for(let j = i+1; j < nodes.length; j++) {
+      const b = nodes[j];
+      const weight = Object.keys(a.edge_weights)
+        .filter(x => x in b.edge_weights)
+        .length;
+      if(0 < weight) {
+        edges.push({source: a, target: b, weight});
+      }
     }
+  }
+  for(let n of nodes) {
+    n.weight = Object.keys(n.edge_weights).length;
+  }
+  return {nodes, edges};
 }
-
-display(subs);
 ```
 
 ```js
-const i = view(Inputs.range([0, subs.length-1], {value:0, step: 1}));
+const graph = mkGraph(clusters);
+display(graph);
 ```
 
 ```js
-const s = subs[i];
-const a = triplesToGraph(s[0]);
-const b = triplesToGraph(s[1]);
-display({links: linkSet(s[0]), triples: s[0]});
-display({links: linkSet(s[1]), triples: s[1]});
+const min_weight = view(Inputs.range([1, 7], {value:4, step: 1}));
 ```
+
 
 <div style="display: flex;">
- <div style="flex-basis:50%">${display(forceLayout(a))}</div>
- <div style="flex-basis:50%">${display(forceLayout(b))}</div>
+ ${display(forceLayout(graph, {w: 1200, h: 1000, min_weight}))}
 </div>
-
-```js
-const data = [];
-for(let i = 0; i < subs.length; i++) {
-    const a = linkSet(subs[i][1]);
-    for(let j = 0; j < subs.length; j++) {
-        const b = linkSet(subs[j][1]);
-        let val = 0;
-        for(let x of b) {
-            val += a.has(x) ? 1 : 0;
-        }
-        data.push({x:i, y:j, val});
-    }
-}
-
-display(Plot.plot({
-    width: 900,
-    x: {axis: null},
-    y: {axis: null},
-    tooltip: {fill: "coral", stroke: "coral"},
-    color: {scheme: "YlGn"},
-    marks: [
-      Plot.cell(data, {x: "x", y: "y", fill: "val"}),
-      Plot.text(data, {x: "x", y: "y", text: "val", title: d => `${d.x}:${d.y} = ${d.val}`}),
-    ]
-}));
-```
