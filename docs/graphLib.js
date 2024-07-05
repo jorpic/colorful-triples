@@ -1,4 +1,19 @@
 
+export function pythagoreanTriples(n) {
+  const res = [];
+  for(let a = 2; a < n-1; a++) {
+    const aa = a * a;
+    for(let b = a; b < n; b++) {
+      const ab = aa + b*b;
+      const c = Math.floor(Math.sqrt(ab));
+      if(c <= n && c*c == ab) {
+        res.push([a,b,c]);
+      }
+    }
+  }
+  return res;
+}
+
 export function linkSet(nodes) {
   return new Set(nodes.flat());
 }
@@ -6,7 +21,7 @@ export function linkSet(nodes) {
 export function groupByEdges(ts) {
   const ls = new Map();
   ts.forEach(xs =>
-    xs.map(x => {
+    xs.forEach(x => {
       if (ls.has(x)) { ls.get(x).push(xs); } else { ls.set(x, [xs]); }
     })
   );

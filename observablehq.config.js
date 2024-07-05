@@ -5,6 +5,7 @@ export default {
       name: "Pages",
       pages: [
         {name: "Drop 2-links", path: "/mergedNodes"},
+        {name: "Pendants", path: "/pendants"},
       ]
     }
   ],
