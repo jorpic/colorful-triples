@@ -1,4 +1,4 @@
-use std::cmp::Reverse;
+use std::cmp;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 
@@ -67,7 +67,7 @@ fn main() -> anyhow::Result<()> {
     // join all .triples() and check
 
     hgraph = hgraph.into_iter().filter(|c| c.nodes.len() >= 20).collect();
-    hgraph.sort_by_key(|c| Reverse(c.nodes.len()));
+    hgraph.sort_by_key(|c| cmp::Reverse(c.nodes.len()));
 
     {
         let file = File::create("clusters.json")?;
@@ -97,7 +97,7 @@ fn get_tightest_cluster_3(clusters: &[Cluster]) -> Option<Cluster> {
     let global_edge_ix = mk_edge_index(clusters);
 
     let sort_key = |c: &Cluster| (
-        Reverse(c.nodes.len()),
+        cmp::Reverse(c.nodes.len()),
         c.edge_weights.len()
     );
 
@@ -109,7 +109,7 @@ fn get_tightest_cluster_3(clusters: &[Cluster]) -> Option<Cluster> {
         // and 35 and 41 give best results.
         // FIXME: find best treshold or better heuristic. The goal is to balance bruteforce
         // time and number of free triples left
-        .filter(|c| c.edge_weights.len() <= 41)
+        .filter(|c| c.edge_weights.len() <= 35)
         .map(|c| (sort_key(&c), c))
         .collect::<Vec<_>>();
 
@@ -121,7 +121,7 @@ fn get_tightest_cluster_2(clusters: &[Cluster]) -> Option<Cluster> {
     let global_edge_ix = mk_edge_index(clusters);
 
     let sort_key = |c: &Cluster| (
-        Reverse(c.nodes.len()),
+        cmp::Reverse(c.nodes.len()),
         c.edge_weights.len()
     );
 
@@ -129,7 +129,7 @@ fn get_tightest_cluster_2(clusters: &[Cluster]) -> Option<Cluster> {
         &global_edge_ix,
         &NeighborhoodOptions {width: 3, min_weight: 2}
         )
-        .filter(|c| c.edge_weights.len() < 41 && 20 <= c.nodes.len())
+        .filter(|c| c.edge_weights.len() <= 37 && 20 <= c.nodes.len())
         .map(|c| (sort_key(&c), c))
         .collect::<Vec<_>>();
 
