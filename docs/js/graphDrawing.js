@@ -55,7 +55,7 @@ export function lineLayout(graph, {w, h}) {
       .attr("cx", n => xScale(n.id))
       .attr("cy", h-r)
       .attr("r", r)
-      .style("fill", "green");
+      .style("fill", n => n.joined ? "red" : "green");
 
   return svg.node();
 }
@@ -107,14 +107,16 @@ export function forceLayout(graph, {w, h, min_weight}) {
       .attr("y2", l => l.target.y)
       .append("title").text(l => l.weight);
 
+  const max_node_weight = Math.max(...graph.nodes.map(n => n.weight));
   svg.selectAll("circle")
     .data(graph.nodes)
     .join("circle")
-      .attr("fill", "green")
+      .attr("fill", n => d3.interpolateYlGn(n.weight/max_node_weight))
       .attr("cx", c => c.x)
       .attr("cy", c => c.y)
-      .attr("r", c => c.weight / 6)
-      .append("title").text(c => c.weight);
+      .attr("r", c => c.size / 6)
+      .append("title")
+        .text(c => `size: ${c.size}, weight: ${c.weight} joined: ${c.joined}`);
 
   return svg.node();
 }

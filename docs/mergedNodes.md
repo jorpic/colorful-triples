@@ -1,8 +1,8 @@
 # One more page
 
 ```js
-import {linkSet, groupByEdges, filterByLinkWeight} from "./graphLib.js";
-import {triplesToGraph, forceLayout} from "./graphDrawing.js";
+import {linkSet, groupByEdges, filterByLinkWeight} from "./js/graphLib.js";
+import {triplesToGraph, forceLayout} from "./js/graphDrawing.js";
 
 const triples = FileAttachment("data/triples.json").json();
 ```
