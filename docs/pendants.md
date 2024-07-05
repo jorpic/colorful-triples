@@ -1,3 +1,6 @@
+---
+style: max-width.css
+---
 
 ```js
 import {pythagoreanTriples, groupByEdges} from "./graphLib.js";
@@ -8,7 +11,7 @@ const allTriples = pythagoreanTriples(MAX_N);
 
 
 ```js
-const N = view(Inputs.range([5, MAX_N], {value: 5, step: 1, label: "N"}));
+const N = view(Inputs.range([5, MAX_N], {value: 1124, step: 1, label: "N"}));
 ```
 
 ```js
@@ -65,7 +68,7 @@ function forceLayout(graph) {
         .distance(10))
     .force(
       "charge",
-      d3.forceManyBody().strength(-250)
+      d3.forceManyBody().strength(-100)
     )
     .force("x", d3.forceX(0))
     .force("y", d3.forceY(0))
@@ -121,6 +124,9 @@ function draw(graph, {w, h, minLabelWeight}) {
 const graph = mkGraph(triples);
 display(graph);
 const size = forceLayout(graph);
+```
+
+```js
 const minLabelWeight = view(Inputs.range([0, 30], {value: 0, step: 1, label: "Hide weak edges"}));
 ```
 
