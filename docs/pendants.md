@@ -4,7 +4,7 @@ style: max-width.css
 
 ```js
 import {pythagoreanTriples} from "./js/graphLib.js";
-import {mkGraph, applyLayout, graphSVG} from "./js/pendants.js";
+import {mkGraph, applyLayout, markPendants, graphSVG} from "./js/pendants.js";
 const MAX_N = 7825;
 const allTriples = pythagoreanTriples(MAX_N);
 ```
@@ -18,13 +18,29 @@ const N = view(
         {value: 1235, step: 1, label: "N"}
     )
 );
+
+const dropPendants = view(
+    Inputs.toggle({
+        label: "Drop pendants",
+        value: false
+    })
+);
 ```
 
 ```js
 const triples = allTriples.filter(([a,b,c]) => a <= N && b <= N && c <= N);
-const graph = mkGraph(triples);
-display(graph);
-const size = applyLayout(graph);
+const fullGraph = mkGraph(triples);
+markPendants(fullGraph);
+const shrinkedGraph = mkGraph(
+    fullGraph.nodes
+        .filter(n => !n.pendant)
+        .map(n => n.labels)
+);
+
+const graph = dropPendants ? shrinkedGraph : fullGraph;
+applyLayout(graph);
+display(fullGraph);
+display(shrinkedGraph);
 ```
 
 
@@ -38,6 +54,6 @@ const minLabelWeight = view(
 ```
 
 <div style="display: flex;">
-    ${display(graphSVG(graph, {...size, minLabelWeight}))}
+    ${display(graphSVG(graph, {width, minLabelWeight}))}
 </div>
 

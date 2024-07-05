@@ -34,6 +34,31 @@ export function mkGraph(ns) {
   };
 }
 
+export function markPendants(graph) {
+  for(let iter = 1; true; iter++) {
+    let count = 0;
+
+    graph.nodes.forEach(n => {
+      if(n.pendant) return;
+
+      const isPendant = n.labels.some(l =>
+        graph.labels.get(l)
+          .filter(x => !x.pendant || x.pendant == iter)
+          .length <= 1
+      );
+      if(isPendant) {
+        count++;
+        n.pendant = iter;
+      }
+    });
+
+    if(count === 0) {
+      graph.maxPendantDepth = iter;
+      break;
+    }
+  }
+}
+
 
 export function applyLayout(graph) {
   d3.forceSimulation(graph.nodes)
@@ -56,17 +81,19 @@ export function applyLayout(graph) {
   const w = maxX - minX;
   const h = maxY - minY;
 
-  return {w, h, maxX, minX, maxY, minY};
+  graph.viewBox = [minX, minY, w, h];
 }
 
 
-export function graphSVG(graph, {w, h, minLabelWeight}) {
-  w += 40;
-  h += 40;
+export function graphSVG(graph, {width, minLabelWeight}) {
+  const [mx, my, w, h] = graph.viewBox;
+  const margin = 10;
+  const viewBox = [mx - margin, my - margin, w + 2*margin, h + 2*margin];
 
   const svg = d3.create("svg")
-      .attr("width", w)
-      .attr("height", h);
+      .attr("preserveAspectRatio", "xMidYMid")
+      .attr("viewBox", viewBox)
+      .attr("width", width / (1 + 4*Math.exp(-w/600)));
 
   const edgeColor = e =>
     d3.interpolateBlues(e.weight / graph.maxLabelWeight);
@@ -75,20 +102,23 @@ export function graphSVG(graph, {w, h, minLabelWeight}) {
     .join("line")
       .attr("stroke", edgeColor)
       .attr("stroke-width", 1)
-      .attr("x1", e => e.source.x + w/2)
-      .attr("y1", e => e.source.y + h/2)
-      .attr("x2", e => e.target.x + w/2)
-      .attr("y2", e => e.target.y + h/2)
+      .attr("x1", e => e.source.x)
+      .attr("y1", e => e.source.y)
+      .attr("x2", e => e.target.x)
+      .attr("y2", e => e.target.y)
       .append("title").text(e => `l:${e.label} w:${e.weight}`);
 
   const nodeColor = n =>
-      d3.interpolateGreens(0.8 * n.weight / graph.maxNodeWeight);
+      n.pendant
+        ? d3.interpolateReds(n.pendant / graph.maxPendantDepth)
+        : d3.interpolateGreens(0.8 * n.weight / graph.maxNodeWeight);
+
   svg.selectAll("node")
     .data(graph.nodes)
     .join("circle")
       .attr("fill", nodeColor)
-      .attr("cx", n => n.x + w/2)
-      .attr("cy", n => n.y + h/2)
+      .attr("cx", n => n.x)
+      .attr("cy", n => n.y)
       .attr("r", 6)
       .append("title")
         .text(n => JSON.stringify(n.labels))
