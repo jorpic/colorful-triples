@@ -3,12 +3,13 @@ style: max-width.css
 ---
 
 ```js
+import * as Plot from "npm:@observablehq/plot";
 import {pythagoreanTriples} from "./js/graphLib.js";
 import {mkGraph, applyLayout, markPendants, graphSVG} from "./js/pendants.js";
+
 const MAX_N = 7825;
 const allTriples = pythagoreanTriples(MAX_N);
 ```
-
 
 
 ```js
@@ -39,8 +40,23 @@ const shrinkedGraph = mkGraph(
 
 const graph = dropPendants ? shrinkedGraph : fullGraph;
 applyLayout(graph);
+
 display(fullGraph);
 display(shrinkedGraph);
+```
+
+```js
+const labelWeights = Array(graph.maxLabelWeight+1)
+    .fill()
+    .map((_, weight) => ({weight, count: 0}));
+graph.labels.forEach(ns => labelWeights[ns.length].count++);
+
+display(Plot.plot({
+    width,
+    marks: [
+        Plot.barY(labelWeights, {x: "weight", y: "count", fill: "lightblue"})
+    ]
+}));
 ```
 
 
