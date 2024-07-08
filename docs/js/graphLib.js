@@ -21,9 +21,9 @@ export function linkSet(nodes) {
 export function groupByEdges(ts) {
   const ls = new Map();
   ts.forEach(xs =>
-    xs.forEach(x => {
-      if (ls.has(x)) { ls.get(x).push(xs); } else { ls.set(x, [xs]); }
-    })
+    xs.forEach(x =>
+      ls.has(x) ? ls.get(x).push(xs) : ls.set(x, [xs])
+    )
   );
   return ls;
 }
@@ -32,7 +32,7 @@ export function filterByLinkWeight(ts, {minWeight}) {
   ts = new Set(ts);
   while(true) {
     let deleted = 0;
-    groupByEdges(ts).forEach((_, xs) => {
+    groupByEdges(ts).forEach((xs, _) => {
       if (xs.length < minWeight) {
         xs.forEach(x => ts.delete(x));
         deleted += 1;

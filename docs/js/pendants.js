@@ -5,24 +5,30 @@ export function mkGraph(ns) {
     labels: n,
   }));
 
-  const labels = new Map(); // index of edge labels
+  // Create a map from label to an array of nodes sharing that label.
+  const labels = new Map();
   nodes.forEach(n =>
     n.labels.forEach(l =>
       labels.has(l) ? labels.get(l).push(n) : labels.set(l, [n])
     )
   );
 
+  // Node's weight is a sum of its labels' weights.
   nodes.forEach(n => {
     n.weight = n.labels.reduce((s, l) => s + labels.get(l).length, -3);
   });
 
   const edges = [];
   labels.forEach((ns, label) => {
-    const weight = ns.length;
     for(let i = 0; i < ns.length-1; i++) {
         for(let j = i+1; j < ns.length; j++) {
-            edges.push({source: ns[i], target: ns[j], label,
-            weight});
+            edges.push({
+              source: ns[i],
+              target: ns[j],
+              // Edge weight is the same as its label weight.
+              weight: ns.length,
+              label,
+            });
         }
     }
   });
@@ -34,30 +40,35 @@ export function mkGraph(ns) {
   };
 }
 
-export function markPendants(graph) {
-  for(let iter = 1; true; iter++) {
-    let count = 0;
 
-    graph.nodes.forEach(n => {
-      if(n.pendant) return;
+export function getWeakNodes(graph, {maxWeight}) {
+  const weakNodes = new Map();
+  let maxDepth = 0;
 
-      const isPendant = n.labels.some(l =>
-        graph.labels.get(l)
-          .filter(x => !x.pendant || x.pendant == iter)
-          .length <= 1
-      );
-      if(isPendant) {
-        count++;
-        n.pendant = iter;
+  for(let depth = 1; true; depth++) {
+    let foundWeak = false;
+
+    graph.labels.forEach((ns, _l) => {
+      // ns = nodes connected by the edges with a label _l
+      const xs = ns
+        .filter(n => !weakNodes.has(n) || weakNodes.get(n) == depth);
+
+      if(0 < xs.length && xs.length <= maxWeight) {
+        foundWeak = true;
+        xs.forEach(n => weakNodes.set(n, depth));
       }
     });
 
-    if(count === 0) {
-      graph.maxPendantDepth = iter;
+    if(!foundWeak) {
       break;
     }
+    maxDepth = depth;
   }
+  return {nodes: weakNodes, maxDepth};
 }
+
+
+// FIXME: filterWeakLinks(graph, {maxDepth, maxWeight}) -> graph
 
 
 export function applyLayout(graph) {
@@ -85,7 +96,7 @@ export function applyLayout(graph) {
 }
 
 
-export function graphSVG(graph, {width, minLabelWeight}) {
+export function graphSVG(graph, pendants, {width, minLabelWeight}) {
   const [mx, my, w, h] = graph.viewBox;
   const margin = 10;
   const viewBox = [mx - margin, my - margin, w + 2*margin, h + 2*margin];
@@ -108,10 +119,12 @@ export function graphSVG(graph, {width, minLabelWeight}) {
       .attr("y2", e => e.target.y)
       .append("title").text(e => `l:${e.label} w:${e.weight}`);
 
-  const nodeColor = n =>
-      n.pendant
-        ? d3.interpolateReds(n.pendant / graph.maxPendantDepth)
+  const nodeColor = n => {
+      const pendantDepth = pendants.nodes.get(n);
+      return pendantDepth !== undefined
+        ? d3.interpolateReds(pendantDepth / pendants.maxDepth)
         : d3.interpolateGreens(0.8 * n.weight / graph.maxNodeWeight);
+  };
 
   svg.selectAll("node")
     .data(graph.nodes)
