@@ -94,7 +94,7 @@ impl Cluster {
 
 type EdgeIx<N> = BTreeMap<Edge, Vec<N>>;
 
-// Each vector in the Map values will be ordered if the `nodes` is ordered.
+// Each vector in the Map will be ordered if the `nodes` is ordered.
 pub fn mk_edge_index<'a, N, I>(nodes: I) -> EdgeIx<&'a N>
 where
     N: Node,
@@ -142,9 +142,48 @@ pub fn tight_neighborhoods<'a>(
             if triples.is_empty() {
                 None
             } else {
-                Some(Cluster::from_triples(&triples))
+                // Some([Cluster::from_triples(&triples)])
+                Some(connected_components(&triples))
             }
         })
+        .flatten()
+}
+
+fn connected_components(triples: &[Triple]) -> Vec<Cluster> {
+    let edge_ix = mk_edge_index(triples);
+    let mut triples = Vec::from(triples);
+    let mut components = vec![];
+
+    while let Some(node) = triples.pop() {
+        let mut component: BTreeSet<Triple> = BTreeSet::new();
+        let mut prev_nodes: BTreeSet<Triple> = BTreeSet::from([node]);
+        let mut new_nodes: BTreeSet<Triple> = BTreeSet::new();
+
+        loop {
+            for node in prev_nodes.iter() {
+                for edge in node.edges() {
+                    for nn in edge_ix.get(&edge).unwrap() {
+                        if !component.contains(*nn) && !prev_nodes.contains(*nn) {
+                            new_nodes.insert(**nn);
+                        }
+                    }
+                }
+            }
+
+            component.append(&mut prev_nodes);
+
+            if new_nodes.is_empty() {
+                break;
+            }
+
+            prev_nodes.append(&mut new_nodes);
+        }
+
+        triples.retain(|t| !component.contains(t));
+        components.push(Cluster::from_triples(&component));
+    }
+
+    components
 }
 
 pub fn edge_neighborhood(center: Edge, edge_ix: &EdgeIx<&Cluster>, width: usize) -> Cluster {
@@ -157,8 +196,9 @@ pub fn edge_neighborhood(center: Edge, edge_ix: &EdgeIx<&Cluster>, width: usize)
     for _w in 0..width {
         for e in &prev_edges {
             for n in edge_ix.get(e).unwrap() {
+                // NB: We are skipping large clusters here
+                // to prevent NH explosion!
                 if n.edge_weights.len() > 20 {
-                    // NB: Skip big clusters!
                     continue;
                 }
                 if subgraph_nodes.insert(n) {
