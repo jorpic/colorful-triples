@@ -6,6 +6,8 @@ export default {
       pages: [
         {name: "Drop 2-links", path: "/mergedNodes"},
         {name: "Pendants", path: "/pendants"},
+        {name: "Neighborhoods", path: "/neighborhoods"},
+        {name: "Cluster Extensions", path: "/cluster-ext"},
       ]
     }
   ],
