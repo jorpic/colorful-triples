@@ -41,16 +41,18 @@ for(let c of raw_clusters) {
         }
     }
     ext.sort((a,b) => b.length - a.length);
-    c.extension = new Set();
+    c.extensions = [new Set(), new Set()];
+    let ext_i = 0;
     for(let ns of ext) {
-        c.extension.add(ns[0]);
-        if(c.extension.size == 13) {
-            break;
+        c.extensions[ext_i].add(ns[0]);
+        if(c.extensions[ext_i].size == 13) {
+            ext_i++;
+            if(c.extensions.length <= ext_i) break;
         }
     }
 
     free_triples = free_triples
-        .filter(t => !c.extension.has(t));
+        .filter(t => !c.extensions.some(e => e.has(t)));
 }
 
 const clusters = raw_clusters; // this is for dependency ordering
@@ -72,7 +74,7 @@ const clusterIx = view(
 const cluster = clusters[clusterIx];
 const graph = mkGraph(
     cluster.nodes
-        .concat([...cluster.extension])
+        .concat([...cluster.extensions[0]])
 );
 applyLayout(graph);
 ```
@@ -150,12 +152,12 @@ function graphSVG(graph, cluster, {width}) {
       .append("title").text(e => `l:${e.label} w:${e.weight}`);
 
   const nodeColor = n =>
-    cluster.extension.has(n.labels)
+    cluster.extensions[0].has(n.labels)
         ? "green"
         : d3.schemeSet1[n.component.id];
 
   const nodeSize = n =>
-    cluster.extension.has(n.labels)
+    cluster.extensions[0].has(n.labels)
         ? 4
         : n.weight / 2;
 
@@ -175,15 +177,22 @@ function graphSVG(graph, cluster, {width}) {
 
 
 ```js
-const cluster_nodes = clusters.map(c => ({
-    is_cluster: true,
+const cluster_nodes = clusters.map((c, ix) => ({
+    ix,
+    color: "red",
     labels: new Set(c.nodes.flat()),
 }));
 
-const extension_nodes = clusters.map(c => ({
-    is_extension: true,
-    labels: new Set([...c.extension].flat()),
-}));
+const extension_nodes = clusters.map((c, ix) => ({
+    ix: ix + "_0",
+    color: "green",
+    labels: new Set([...c.extensions[0]].flat()),
+})).concat(
+    clusters.map((c, ix) => ({
+        ix: ix + "_1",
+        color: "blue",
+        labels: new Set([...c.extensions[1]].flat()),
+})));
 
 const joined_nodes = cluster_nodes.concat(extension_nodes);
 const joined_edges = [];
@@ -194,7 +203,7 @@ for(let i = 0; i < joined_nodes.length-1; i++) {
         const target = joined_nodes[j];
         const common_labels = source.labels
             .intersection(target.labels);
-        if (common_labels.size > 5) {
+        if (common_labels.size >= 6) {
             joined_edges.push({
                 source, target,
                 weight: common_labels.size,
@@ -236,15 +245,14 @@ function joinedSVG(graph) {
       .attr("y2", e => e.target.y)
       .append("title").text(e => `w:${e.weight}`);
 
-  const nodeColor = n => n.is_cluster ? "red" : "green";
-
   svg.selectAll("node")
     .data(graph.nodes)
     .join("circle")
-      .attr("fill", nodeColor)
+      .attr("fill", n => n.ix < 15 ? "orange" : n.color)
       .attr("cx", n => n.x)
       .attr("cy", n => n.y)
-      .attr("r",  4);
+      .attr("r", n => n.ix < 15 ? 10 : 5)
+      .append("title").text(n => `ix:${n.ix}`);
 
   return svg.node();
 }
