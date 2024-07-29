@@ -1,6 +1,7 @@
 use std::cmp;
 use std::fs::File;
 use std::io::{BufWriter, Write};
+use std::collections::BTreeMap;
 
 mod triples;
 use triples::*;
@@ -26,14 +27,19 @@ fn main() -> anyhow::Result<()> {
             break;
         };
 
-        let now = std::time::Instant::now();
         println!(
-            "mw=3 triples={} edges={} solutions={} elapsed={:.2?}",
+            "mw=3 triples={} edges={} inner_edges={}",
             best_cluster.nodes.len(),
             best_cluster.edge_weights.len(),
-            0, // brute_force(&best_cluster.triples().collect::<Vec<_>>()),
-            now.elapsed(),
+            best_cluster.inner_edges(&global_edge_weights),
         );
+
+        //let now = std::time::Instant::now();
+        //println!(
+        //    "solutions={} elapsed={:.2?}",
+        //    brute_force(&best_cluster.triples().collect::<Vec<_>>()),
+        //    now.elapsed()
+        //);
 
         hgraph.retain(|c| c.nodes.is_disjoint(&best_cluster.nodes));
         hgraph.push(best_cluster);
@@ -46,17 +52,15 @@ fn main() -> anyhow::Result<()> {
             &JoinNodesOptions {min_edge_weight: 15, max_out_edges: 40});
         println!("nodes: {}", hgraph.len());
 
-        let Some(best_cluster) = get_tightest_cluster_2(&hgraph) else {
+        let Some(best_cluster) = get_tightest_cluster_2(&hgraph, &global_edge_weights) else {
             break;
         };
 
-        let now = std::time::Instant::now();
         println!(
-            "mw=2 triples={} edges={} solutions={} elapsed={:.2?}",
+            "mw=2 triples={} edges={} inner_edges={}",
             best_cluster.nodes.len(),
             best_cluster.edge_weights.len(),
-            0, // brute_force(&best_cluster.triples().collect::<Vec<_>>()),
-            now.elapsed(),
+            best_cluster.inner_edges(&global_edge_weights),
         );
 
         hgraph.retain(|c| c.nodes.is_disjoint(&best_cluster.nodes));
@@ -109,7 +113,7 @@ fn get_tightest_cluster_3(clusters: &[Cluster]) -> Option<Cluster> {
         // and 35 and 41 give best results.
         // FIXME: find best treshold or better heuristic. The goal is to balance bruteforce
         // time and number of free triples left
-        .filter(|c| c.edge_weights.len() <= 35)
+        .filter(|c| c.edge_weights.len() <= 39)
         .map(|c| (sort_key(&c), c))
         .collect::<Vec<_>>();
 
@@ -117,7 +121,7 @@ fn get_tightest_cluster_3(clusters: &[Cluster]) -> Option<Cluster> {
     nhs.first().map(|c| c.1.clone())
 }
 
-fn get_tightest_cluster_2(clusters: &[Cluster]) -> Option<Cluster> {
+fn get_tightest_cluster_2(clusters: &[Cluster], global_weights: &BTreeMap<Edge, usize>) -> Option<Cluster> {
     let global_edge_ix = mk_edge_index(clusters);
 
     let sort_key = |c: &Cluster| (
@@ -129,7 +133,7 @@ fn get_tightest_cluster_2(clusters: &[Cluster]) -> Option<Cluster> {
         &global_edge_ix,
         &NeighborhoodOptions {width: 3, min_weight: 2}
         )
-        .filter(|c| c.edge_weights.len() <= 37 && 20 <= c.nodes.len())
+        .filter(|c| c.outer_edges(global_weights) <= 37 && 20 <= c.nodes.len())
         .map(|c| (sort_key(&c), c))
         .collect::<Vec<_>>();
 

@@ -248,10 +248,10 @@ function joinedSVG(graph) {
   svg.selectAll("node")
     .data(graph.nodes)
     .join("circle")
-      .attr("fill", n => n.ix < 15 ? "orange" : n.color)
+      .attr("fill", n => n.ix < 5 ? "orange" : n.color)
       .attr("cx", n => n.x)
       .attr("cy", n => n.y)
-      .attr("r", n => n.ix < 15 ? 10 : 5)
+      .attr("r", n => n.ix < 5 ? 10 : 5)
       .append("title").text(n => `ix:${n.ix}`);
 
   return svg.node();

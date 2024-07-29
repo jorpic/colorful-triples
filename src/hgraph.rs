@@ -90,6 +90,20 @@ impl Cluster {
     fn merge_with(&mut self, b: &Cluster) {
         self.add_triples(&b.nodes)
     }
+
+    pub fn inner_edges(&self, global_weights: &BTreeMap<Edge, usize>) -> usize {
+        self.edge_weights
+            .iter()
+            .filter(|(e, w)| global_weights.get(e).unwrap() <= *w)
+            .count()
+    }
+
+    pub fn outer_edges(&self, global_weights: &BTreeMap<Edge, usize>) -> usize {
+        self.edge_weights
+            .iter()
+            .filter(|(e, w)| *w < global_weights.get(e).unwrap())
+            .count()
+    }
 }
 
 type EdgeIx<N> = BTreeMap<Edge, Vec<N>>;
