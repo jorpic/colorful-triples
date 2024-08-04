@@ -91,18 +91,12 @@ impl Cluster {
         self.add_triples(&b.nodes)
     }
 
-    pub fn inner_edges(&self, global_weights: &BTreeMap<Edge, usize>) -> usize {
+    pub fn inner_edges(&self, global_weights: &BTreeMap<Edge, usize>) -> BTreeSet<Edge> {
         self.edge_weights
             .iter()
             .filter(|(e, w)| global_weights.get(e).unwrap() <= *w)
-            .count()
-    }
-
-    pub fn outer_edges(&self, global_weights: &BTreeMap<Edge, usize>) -> usize {
-        self.edge_weights
-            .iter()
-            .filter(|(e, w)| *w < global_weights.get(e).unwrap())
-            .count()
+            .map(|x| *x.0)
+            .collect()
     }
 }
 
@@ -262,17 +256,16 @@ where
 
 pub struct JoinNodesOptions {
     pub min_edge_weight: usize,
-    pub max_out_edges: usize,
+    pub max_edges: usize,
 }
 
 pub fn join_weak_nodes(
     clusters: &[Cluster],
-    global_weights: &BTreeMap<Edge, usize>,
     opt: &JoinNodesOptions
 ) -> Vec<Cluster> {
     let mut clusters = clusters.to_vec();
     loop {
-        let new_clusters = join_weak_nodes_single_pass(&clusters, global_weights, opt);
+        let new_clusters = join_weak_nodes_single_pass(&clusters, opt);
         if new_clusters.len() == clusters.len() {
             return new_clusters;
         }
@@ -282,7 +275,6 @@ pub fn join_weak_nodes(
 
 fn join_weak_nodes_single_pass(
     clusters: &[Cluster],
-    global_weights: &BTreeMap<Edge, usize>,
     opt: &JoinNodesOptions,
 ) -> Vec<Cluster> {
     let edge_index = mk_edge_index(clusters);
@@ -307,12 +299,7 @@ fn join_weak_nodes_single_pass(
             new_cluster.merge_with(c);
         }
 
-        let out_edges = new_cluster.edge_weights
-            .iter()
-            .filter(|(e, w)| global_weights.get(e).unwrap() > w)
-            .count();
-
-        if out_edges <= opt.max_out_edges {
+        if new_cluster.edge_weights.len() <= opt.max_edges {
             for c in adjacent_clusters {
                 merged.insert(c.id());
             }

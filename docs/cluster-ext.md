@@ -68,13 +68,19 @@ const clusterIx = view(
         {value: 0, step: 1, label: "Select a cluster"}
     )
 );
+const showExtension = view(
+    Inputs.toggle({
+        label: "Show extension",
+        value: false
+    })
+);
 ```
 
 ```js
 const cluster = clusters[clusterIx];
 const graph = mkGraph(
     cluster.nodes
-        .concat([...cluster.extensions[0]])
+        .concat(showExtension ? [...cluster.extensions[0]] : [])
 );
 applyLayout(graph);
 ```
