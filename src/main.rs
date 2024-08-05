@@ -16,13 +16,36 @@ fn main() -> anyhow::Result<()> {
     let triples = pythagorean_triples(7825);
 
     let hgraph: Vec<_> = triples.iter().map(Cluster::singleton).collect();
-
-    let mut hgraph = drop_weak_nodes(hgraph, 2);
     let global_edge_weights = mk_edge_weights(&hgraph);
-
+    let mut hgraph = drop_weak_nodes(hgraph, 2);
     let mut clusters: Vec<Cluster> = vec![];
 
-    for min_weight in [3, 2]{
+    for min_edge_weight in 3..19 {
+        hgraph = join_weak_nodes(
+            &hgraph,
+            &JoinNodesOptions {min_edge_weight, max_edges: 43});
+
+        println!(
+            "nodes after joining with min_edge_weight={}: {}",
+            min_edge_weight,
+            hgraph.len());
+    }
+
+    {
+        let mut ts: Vec<Cluster> = vec![];
+        for c in hgraph {
+            if c.nodes.len() >= 20 {
+                clusters.push(c);
+            } else {
+                for t in &c.nodes {
+                    ts.push(Cluster::from_triples([t]));
+                }
+            }
+        }
+        hgraph = ts;
+    }
+
+    for min_weight in [3, 2] {
         loop {
             let Some(best_cluster) = get_tightest_cluster(
                 &hgraph,
@@ -44,24 +67,9 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
-    for min_edge_weight in 3..10 {
-        hgraph = join_weak_nodes(
-            &hgraph,
-            &JoinNodesOptions {min_edge_weight, max_edges: 41});
-
-        println!(
-            "nodes after joining with min_edge_weight={}: {}",
-            min_edge_weight,
-            hgraph.len());
-    }
-
     println!(
         "remaining triples = {}",
         hgraph.iter().map(|c| c.nodes.len()).sum::<usize>());
-
-    hgraph.into_iter()
-        .filter(|c| c.nodes.len() >= 20)
-        .for_each(|c| clusters.push(c));
 
     println!(
         "clusters = {}, triples in clusters = {}",
