@@ -44,7 +44,7 @@ pub fn slow_brute_force(base: &[Triple], exts: &[Triple]) -> Vec<u64> {
     solutions
 }
 
-pub fn fast_brute_force(base: &[Triple], exts: &[Triple]) -> Vec<u64> {
+pub fn fast_brute_force(base: &[Triple], exts: &[Triple]) -> usize {
     // base edges in order as they occur in base triples
     let base_edges: Vec<Edge> = base
         .iter().flatten().cloned().collect();
@@ -73,11 +73,11 @@ pub fn fast_brute_force(base: &[Triple], exts: &[Triple]) -> Vec<u64> {
         x = (x << 3) | 0b001;
     }
 
-    let mut solutions = vec![];
+    let mut solutions = 0;
     while x < n {
         for _ in 0..6 {
             if masks.iter().all(|m| x & m != *m && x & m != 0) {
-                solutions.push(x);
+                solutions += 1;
             }
             x += 1;
         }
@@ -94,7 +94,7 @@ pub fn fast_brute_force(base: &[Triple], exts: &[Triple]) -> Vec<u64> {
     solutions
 }
 
-pub fn simd_fast_brute_force(base: &[Triple], exts: &[Triple]) -> Vec<u64> {
+pub fn simd_fast_brute_force(base: &[Triple], exts: &[Triple]) -> usize {
     // base edges in order as they occur in base triples
     let base_edges: Vec<Edge> = base
         .iter().flatten().cloned().collect();
@@ -132,7 +132,7 @@ pub fn simd_fast_brute_force(base: &[Triple], exts: &[Triple]) -> Vec<u64> {
         x = (x << 3) | 0b001;
     }
 
-    let mut solutions = vec![];
+    let mut solutions = 0;
     while x < n {
         let mut x_vec = u64x4::splat(x);
         for _ in 0..6 {
@@ -143,7 +143,7 @@ pub fn simd_fast_brute_force(base: &[Triple], exts: &[Triple]) -> Vec<u64> {
                     (mv_vec.simd_ne(*m_vec) & mv_vec.simd_ne(zero_vec)).all()
                 });
             if is_solution {
-                solutions.push(x_vec[0]);
+                solutions += 1; //.push(x_vec[0]);
             }
             x_vec += unit_vec;
         }
@@ -199,22 +199,22 @@ pub fn main() {
     let res1 = simd_fast_brute_force(&base, &exts);
     println!(
         "solutions: {}, time: {:?}",
-        res1.len(),
+        res1, // .len(),
         now.elapsed());
 
     let now = std::time::Instant::now();
     let res2 = fast_brute_force(&base, &exts);
     println!(
         "solutions: {}, time: {:?}",
-        res2.len(),
+        res2, //.len(),
         now.elapsed());
 
-    for i in 0..res1.len() {
-        if res1[i] != res2[i] {
-            println!("{i}");
-            println!("{:036b} {:036b}", res1[i-1], res1[i]);
-            println!("{:036b} {:036b}", res2[i-1], res2[i]);
-            break;
-        }
-    }
+    //for i in 0..res1.len() {
+    //    if res1[i] != res2[i] {
+    //        println!("{i}");
+    //        println!("{:036b} {:036b}", res1[i-1], res1[i]);
+    //        println!("{:036b} {:036b}", res2[i-1], res2[i]);
+    //        break;
+    //    }
+    //}
 }
