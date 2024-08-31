@@ -36,6 +36,7 @@ impl Node for Triple {
 #[derive(Clone, Debug, Default, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub struct Cluster {
     pub nodes: BTreeSet<Triple>,
+    pub base: BTreeSet<Triple>,
     pub edge_weights: BTreeMap<Edge, usize>,
 }
 
@@ -85,7 +86,27 @@ impl Cluster {
             }
             self.nodes.insert(*triple);
         }
+
+        self.base = Cluster::get_base(&self.nodes);
     }
+
+    fn get_base<'a, T>(triples: T) -> BTreeSet<Triple>
+        where
+            T: IntoIterator<Item = &'a Triple>,
+    {
+        let mut base = BTreeSet::new();
+        let mut used_edges = BTreeSet::new();
+        for t in triples {
+            if !t.iter().any(|e| used_edges.contains(e)) {
+                for e in t {
+                    used_edges.insert(*e);
+                }
+                base.insert(*t);
+            }
+        }
+        base
+    }
+
 
     fn merge_with(&mut self, b: &Cluster) {
         self.add_triples(&b.nodes)

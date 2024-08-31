@@ -1,6 +1,8 @@
+#![feature(portable_simd)]
 use std::cmp;
 use std::fs::File;
 use std::io::{BufWriter, Write, stdout};
+use std::collections::BTreeSet;
 use thousands::Separable;
 
 mod triples;
@@ -20,50 +22,64 @@ fn main() -> anyhow::Result<()> {
     let mut hgraph = drop_weak_nodes(hgraph, 2);
     let mut clusters: Vec<Cluster> = vec![];
 
-    for min_edge_weight in 3..19 {
-        hgraph = join_weak_nodes(
-            &hgraph,
-            &JoinNodesOptions {min_edge_weight, max_edges: 43});
-
-        println!(
-            "nodes after joining with min_edge_weight={}: {}",
-            min_edge_weight,
-            hgraph.len());
-    }
-
-    {
-        let mut ts: Vec<Cluster> = vec![];
-        for c in hgraph {
-            if c.nodes.len() >= 20 {
-                clusters.push(c);
-            } else {
-                for t in &c.nodes {
-                    ts.push(Cluster::from_triples([t]));
-                }
-            }
-        }
-        hgraph = ts;
-    }
+    //for min_edge_weight in 3..19 {
+    //    hgraph = join_weak_nodes(
+    //        &hgraph,
+    //        &JoinNodesOptions {min_edge_weight, max_edges: 41});
+    //
+    //    println!(
+    //        "nodes after joining with min_edge_weight={}: {}",
+    //        min_edge_weight,
+    //        hgraph.len());
+    //}
+    //
+    //{
+    //    let mut ts: Vec<Cluster> = vec![];
+    //    for c in hgraph {
+    //        let inner_edges = c.inner_edges(&global_edge_weights).len();
+    //        if inner_edges > 5 {
+    //            println!(
+    //                "innr triples={} edges={} inner_edges={} base={}",
+    //                c.nodes.len(),
+    //                c.edge_weights.len(),
+    //                inner_edges,
+    //                c.base.len(),
+    //            );
+    //            clusters.push(c);
+    //        } else {
+    //            for t in &c.nodes {
+    //                ts.push(Cluster::from_triples([t]));
+    //            }
+    //        }
+    //    }
+    //    hgraph = ts;
+    //}
 
     for min_weight in [3, 2] {
         loop {
-            let Some(best_cluster) = get_tightest_cluster(
+            println!("");
+
+            let tight_clusters = get_tight_clusters(
                 &hgraph,
-                &NeighborhoodOptions {width: 3, min_weight},
-            ) else {
+                &NeighborhoodOptions {width: 3, min_weight});
+
+            if tight_clusters.len() == 0 {
                 break;
-            };
+            }
 
-            println!(
-                "mw={} triples={} edges={} inner_edges={}",
-                min_weight,
-                best_cluster.nodes.len(),
-                best_cluster.edge_weights.len(),
-                best_cluster.inner_edges(&global_edge_weights).len(),
-            );
+            for tc in tight_clusters {
+                println!(
+                    "mw={} triples={} edges={} inner_edges={} base={}",
+                    min_weight,
+                    tc.nodes.len(),
+                    tc.edge_weights.len(),
+                    tc.inner_edges(&global_edge_weights).len(),
+                    tc.base.len(),
+                );
 
-            hgraph.retain(|c| c.nodes.is_disjoint(&best_cluster.nodes));
-            clusters.push(best_cluster);
+                hgraph.retain(|c| c.nodes.is_disjoint(&tc.nodes));
+                clusters.push(tc);
+            }
         }
     }
 
@@ -79,6 +95,7 @@ fn main() -> anyhow::Result<()> {
 
     clusters.sort_by_key(
         |c| (
+            cmp::Reverse(c.base.len()),
             cmp::Reverse(c.inner_edges(&global_edge_weights).len()),
             cmp::Reverse(c.nodes.len())
         )
@@ -93,21 +110,19 @@ fn main() -> anyhow::Result<()> {
 
     for c in &clusters {
         print!(
-            "triples={} edges={} inner_edges={} ",
+            "triples={} edges={} base={} inner_edges={}",
             c.nodes.len(),
             c.edge_weights.len(),
+            c.base.len(),
             c.inner_edges(&global_edge_weights).len(),
         );
 
         stdout().flush().unwrap();
 
-        let triples = c.triples().collect::<Vec<_>>();
-        let inner_edges = c.inner_edges(&global_edge_weights);
         let now = std::time::Instant::now();
         println!(
             "solutions={} elapsed={:.2?}",
-            brute_force(&triples, &inner_edges)
-                .separate_with_commas(),
+            fast_brute_force(&c).separate_with_commas(),
             now.elapsed()
         );
     }
@@ -115,24 +130,36 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-
-fn get_tightest_cluster(clusters: &[Cluster], opts: &NeighborhoodOptions) -> Option<Cluster> {
+fn get_tight_clusters(clusters: &[Cluster], opts: &NeighborhoodOptions) -> Vec<Cluster> {
     let global_edge_ix = mk_edge_index(clusters);
 
-    let sort_key = |c: &Cluster| (
-        cmp::Reverse(c.nodes.len()),
-        c.edge_weights.len()
-    );
-
     let mut nhs = tight_neighborhoods(&global_edge_ix, opts)
-        // I have tried 42,41,40,39..35
-        // and 35 and 41 give best results.
-        // FIXME: find best treshold or better heuristic. The goal is to balance bruteforce
-        // time and number of free triples left
-        .filter(|c| c.edge_weights.len() <= 41 && 20 <= c.nodes.len())
-        .map(|c| (sort_key(&c), c))
+        .filter(|c|
+            c.edge_weights.len() <= 42
+                && 25 <= c.nodes.len()
+                && c.edge_weights.len() == c.base.len() * 3
+        )
         .collect::<Vec<_>>();
 
-    nhs.sort_by_key(|c| c.0);
-    nhs.first().map(|c| c.1.clone())
+    nhs.sort_by_key(|c: &Cluster| (
+        cmp::Reverse(c.base.len()),
+        cmp::Reverse(c.nodes.len()),
+        c.edge_weights.len()
+    ));
+
+    let mut used_edges = BTreeSet::new();
+    let mut res = vec![];
+    for c in nhs {
+        let has_intersection = c.edge_weights.keys().any(
+            |e| used_edges.contains(e)
+        );
+
+        if !has_intersection {
+            for e in c.edge_weights.keys() {
+                used_edges.insert(*e);
+            }
+            res.push(c);
+        }
+    }
+    res
 }
