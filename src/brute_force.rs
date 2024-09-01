@@ -1,7 +1,6 @@
 use std::collections::BTreeSet;
 use std::simd::{cmp::SimdPartialEq, u64x4, Simd};
 
-use crate::cluster::Cluster;
 use crate::types::{Edge, Triple};
 
 fn edges<'a, T>(triples: T) -> BTreeSet<Edge>
@@ -61,7 +60,7 @@ pub fn fast_brute_force(
         .collect();
 
     let masks: Vec<u64> = exts
-        .into_iter()
+        .iter()
         .map(|t| {
             let mut mask: u64 = 0;
             for l in t {
@@ -105,8 +104,8 @@ pub fn fast_brute_force(
         let mut incr = 0b010_000;
         while x & mask == mask {
             x += incr;
-            mask = mask << 3;
-            incr = incr << 3;
+            mask <<= 3;
+            incr <<= 3;
         }
     }
 

@@ -63,7 +63,7 @@ fn main() -> anyhow::Result<()> {
 
     for min_weight in [3] {
         loop {
-            println!("");
+            println!();
 
             let tight_clusters = get_tight_clusters(
                 &hgraph,
@@ -73,7 +73,7 @@ fn main() -> anyhow::Result<()> {
                 },
             );
 
-            if tight_clusters.len() == 0 {
+            if tight_clusters.is_empty() {
                 break;
             }
 
@@ -116,7 +116,7 @@ fn main() -> anyhow::Result<()> {
         let mut used_triples: BTreeSet<Triple> = BTreeSet::new();
 
         for c in clusters {
-            println!("");
+            println!();
             loop {
                 let mut companion = vec![];
                 let mut used_edges: BTreeSet<Edge> = BTreeSet::new();
