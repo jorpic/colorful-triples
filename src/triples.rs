@@ -1,4 +1,4 @@
-pub type Triple = [u16; 3];
+use crate::types::Triple;
 
 pub fn pythagorean_triples(n: u64) -> Vec<Triple> {
     let mut res = Vec::new();

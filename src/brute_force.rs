@@ -1,7 +1,8 @@
 use std::collections::BTreeSet;
 use std::simd::{u64x4, Simd, cmp::SimdPartialEq};
 
-use crate::hgraph::*;
+use crate::types::{Edge, Triple};
+use crate::cluster::Cluster;
 
 fn edges<'a, T>(triples: T) -> BTreeSet<Edge>
     where
@@ -44,18 +45,15 @@ pub fn brute_force(triples: &[Triple], internal_edges: &BTreeSet<Edge>) -> usize
     solutions
 }
 
-pub fn fast_brute_force(c: &Cluster) -> usize {
-    let exts: Vec<Triple> = c.nodes.difference(&c.base)
-        .cloned().collect();
-
+pub fn fast_brute_force(base: &BTreeSet<Triple>, exts: &BTreeSet<Triple>) -> usize {
     // base edges in order as they occur in base triples
-    let base_edges: Vec<Edge> = c.base
+    let base_edges: Vec<Edge> = base
         .iter().flatten().cloned().collect();
 
     let edges: Vec<Edge> =
         base_edges
             .iter()
-            .chain(edges(&exts).difference(&edges(&c.base)))
+            .chain(edges(exts).difference(&edges(base)))
             .cloned()
             .collect();
 
@@ -63,7 +61,7 @@ pub fn fast_brute_force(c: &Cluster) -> usize {
         .map(|t| {
             let mut mask: u64 = 0;
             for l in t {
-                let i = edges.iter().position(|e| *e == l).unwrap();
+                let i = edges.iter().position(|e| e == l).unwrap();
                 mask |= 1 << i;
             }
             mask
@@ -81,7 +79,7 @@ pub fn fast_brute_force(c: &Cluster) -> usize {
     let mut x = 0;
 
     // starting value is 0b..._001_001_001
-    for _ in &c.base {
+    for _ in base {
         x = (x << 3) | 0b001;
     }
 

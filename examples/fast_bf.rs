@@ -1,6 +1,5 @@
-#![feature(portable_simd)]
 use std::collections::BTreeSet;
-use std::simd::{u64x4, Simd, cmp::SimdPartialEq};
+use colorful_triples::brute_force::fast_brute_force;
 
 pub type Edge = u16;
 pub type Triple = [Edge; 3];
@@ -9,7 +8,7 @@ fn edges(triples: &[Triple]) -> BTreeSet<Edge> {
     triples.iter().flatten().cloned().collect()
 }
 
-pub fn slow_brute_force(base: &[Triple], exts: &[Triple]) -> Vec<u64> {
+pub fn slow_brute_force(base: &[Triple], exts: &[Triple]) -> usize {
     // base edges in order as they occur in base triples
     let base_edges: Vec<Edge> = base
         .iter().flatten().cloned().collect();
@@ -33,10 +32,10 @@ pub fn slow_brute_force(base: &[Triple], exts: &[Triple]) -> Vec<u64> {
 
     let n: u64 = 2_u64.pow(edges.len() as u32);
     let mut x = 0;
-    let mut solutions = vec![];
+    let mut solutions = 0;
     while x < n {
         if masks.iter().all(|m| x & m != *m && x & m != 0) {
-            solutions.push(x);
+            solutions += 1;
         }
         x += 1;
     }
@@ -81,14 +80,14 @@ fn run(cluster: &[Triple]) {
     );
 
     let now = std::time::Instant::now();
-    let res1 = simd_fast_brute_force(&base, &exts);
+    let res1 = fast_brute_force(&base, &exts);
     println!(
         "simd: solutions: {}, time: {:?}",
         res1, // .len(),
         now.elapsed());
 
     let now = std::time::Instant::now();
-    let res2 = fast_brute_force(&base, &exts);
+    let res2 = slow_brute_force(&base, &exts);
     println!(
         "fast: solutions: {}, time: {:?}",
         res2, //.len(),

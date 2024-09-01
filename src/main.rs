@@ -5,14 +5,19 @@ use std::io::{BufWriter, Write, stdout};
 use std::collections::BTreeSet;
 use thousands::Separable;
 
-mod triples;
-use triples::*;
-
+mod alg;
 mod brute_force;
-use brute_force::*;
+mod cluster;
+mod triples;
+mod types;
 
-mod hgraph;
-use hgraph::*;
+use types::*;
+use triples::pythagorean_triples;
+use brute_force::fast_brute_force;
+use cluster::Cluster;
+use alg::edge_index::{mk_edge_index, mk_edge_weights};
+use alg::neighbourhoods::{NeighborhoodOptions, tight_neighborhoods, drop_weak_nodes};
+
 
 fn main() -> anyhow::Result<()> {
     let triples = pythagorean_triples(7825);
@@ -55,7 +60,7 @@ fn main() -> anyhow::Result<()> {
     //    hgraph = ts;
     //}
 
-    for min_weight in [3, 2] {
+    for min_weight in [3] {
         loop {
             println!("");
 
@@ -96,10 +101,80 @@ fn main() -> anyhow::Result<()> {
     clusters.sort_by_key(
         |c| (
             cmp::Reverse(c.base.len()),
-            cmp::Reverse(c.inner_edges(&global_edge_weights).len()),
-            cmp::Reverse(c.nodes.len())
+            cmp::Reverse(c.nodes.len()),
         )
     );
+
+
+    let mut new_clusters: Vec<Cluster> = vec![];
+    {
+        let free_triples: Vec<Triple> = hgraph
+            .into_iter().flat_map(|c| c.nodes).collect();
+        let free_triples_ix = mk_edge_index(&free_triples);
+        let mut used_triples: BTreeSet<Triple> = BTreeSet::new();
+
+        for c in clusters {
+            println!("");
+            loop {
+                let mut companion = vec![];
+                let mut used_edges: BTreeSet<Edge> = BTreeSet::new();
+                for e in c.edges() {
+                    let Some(ts) = free_triples_ix.get(&e) else {
+                        continue;
+                    };
+                    for t in ts {
+                        if used_triples.contains(*t) {
+                            continue;
+                        }
+                        if t.iter().any(|x| used_edges.contains(x)) {
+                            continue
+                        }
+                        for x in *t {
+                            used_edges.insert(*x);
+                        }
+                        companion.push(*t);
+                        break;
+                    }
+                    if companion.len() >= 13 {
+                        break;
+                    }
+                }
+                if companion.len() >= 13 {
+                    for t in &companion {
+                        used_triples.insert(**t);
+                    }
+                    // Add more triples
+                    for e in &used_edges {
+                        let Some(ts) = free_triples_ix.get(e) else {
+                            continue;
+                        };
+                        for t in ts {
+                            if used_triples.contains(*t) {
+                                continue;
+                            }
+                            if t.iter().all(|x| used_edges.contains(x)) {
+                                used_triples.insert(**t);
+                                companion.push(*t);
+                            }
+                        }
+                    }
+                    let cc = Cluster::from_triples(companion);
+                    println!(
+                        "comp triples={} edges={} base={}",
+                        cc.nodes.len(),
+                        cc.edge_weights.len(),
+                        cc.base.len(),
+                    );
+                    new_clusters.push(cc);
+                } else {
+                    break; // can't make good companion
+                }
+            }
+            new_clusters.push(c);
+        }
+    }
+
+    let clusters = new_clusters;
 
     {
         let file = File::create("clusters.json")?;
@@ -110,7 +185,7 @@ fn main() -> anyhow::Result<()> {
 
     for c in &clusters {
         print!(
-            "triples={} edges={} base={} inner_edges={}",
+            "triples={} edges={} base={} inner_edges={} ",
             c.nodes.len(),
             c.edge_weights.len(),
             c.base.len(),
@@ -122,7 +197,11 @@ fn main() -> anyhow::Result<()> {
         let now = std::time::Instant::now();
         println!(
             "solutions={} elapsed={:.2?}",
-            fast_brute_force(&c).separate_with_commas(),
+            fast_brute_force(
+                &c.base,
+                &c.nodes.difference(&c.base).cloned().collect()
+            )
+                .separate_with_commas(),
             now.elapsed()
         );
     }
