@@ -1,18 +1,20 @@
 use std::collections::BTreeSet;
-use std::simd::{u64x4, Simd, cmp::SimdPartialEq};
+use std::simd::{cmp::SimdPartialEq, u64x4, Simd};
 
-use crate::types::{Edge, Triple};
 use crate::cluster::Cluster;
+use crate::types::{Edge, Triple};
 
 fn edges<'a, T>(triples: T) -> BTreeSet<Edge>
-    where
-        T: IntoIterator<Item = &'a Triple>,
+where
+    T: IntoIterator<Item = &'a Triple>,
 {
     triples.into_iter().flatten().cloned().collect()
 }
 
-
-pub fn brute_force(triples: &[Triple], internal_edges: &BTreeSet<Edge>) -> usize {
+pub fn brute_force(
+    triples: &[Triple],
+    internal_edges: &BTreeSet<Edge>,
+) -> usize {
     let mut edges: Vec<Edge> = edges(triples).into_iter().collect();
     // Internal edges first (at the lower-end of a machine word).
     edges.sort_by_key(|e| (!internal_edges.contains(e), *e));
@@ -45,19 +47,21 @@ pub fn brute_force(triples: &[Triple], internal_edges: &BTreeSet<Edge>) -> usize
     solutions
 }
 
-pub fn fast_brute_force(base: &BTreeSet<Triple>, exts: &BTreeSet<Triple>) -> usize {
+pub fn fast_brute_force(
+    base: &BTreeSet<Triple>,
+    exts: &BTreeSet<Triple>,
+) -> usize {
     // base edges in order as they occur in base triples
-    let base_edges: Vec<Edge> = base
-        .iter().flatten().cloned().collect();
+    let base_edges: Vec<Edge> = base.iter().flatten().cloned().collect();
 
-    let edges: Vec<Edge> =
-        base_edges
-            .iter()
-            .chain(edges(exts).difference(&edges(base)))
-            .cloned()
-            .collect();
+    let edges: Vec<Edge> = base_edges
+        .iter()
+        .chain(edges(exts).difference(&edges(base)))
+        .cloned()
+        .collect();
 
-    let masks: Vec<u64> = exts.into_iter()
+    let masks: Vec<u64> = exts
+        .into_iter()
         .map(|t| {
             let mut mask: u64 = 0;
             for l in t {
@@ -87,12 +91,10 @@ pub fn fast_brute_force(base: &BTreeSet<Triple>, exts: &BTreeSet<Triple>) -> usi
     while x < n {
         let mut x_vec = u64x4::splat(x);
         for _ in 0..6 {
-            let is_solution = vectorized_masks
-                .iter()
-                .all(|m_vec| {
-                    let mv_vec = m_vec & x_vec;
-                    (mv_vec.simd_ne(*m_vec) & mv_vec.simd_ne(zero_vec)).all()
-                });
+            let is_solution = vectorized_masks.iter().all(|m_vec| {
+                let mv_vec = m_vec & x_vec;
+                (mv_vec.simd_ne(*m_vec) & mv_vec.simd_ne(zero_vec)).all()
+            });
             if is_solution {
                 solutions += 1; //.push(x_vec[0]);
             }
@@ -110,4 +112,3 @@ pub fn fast_brute_force(base: &BTreeSet<Triple>, exts: &BTreeSet<Triple>) -> usi
 
     solutions
 }
-

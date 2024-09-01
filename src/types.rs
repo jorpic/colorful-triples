@@ -1,4 +1,3 @@
-
 pub type Edge = u16;
 pub type Triple = [Edge; 3];
 
@@ -16,4 +15,3 @@ pub trait Node {
     /// Iterates triples in ascending order.
     fn triples(&self) -> Self::IterTriples<'_>;
 }
-

@@ -1,9 +1,8 @@
 use std::collections::BTreeSet;
 
-use crate::types::*;
-use crate::cluster::Cluster;
 use super::edge_index::*;
-
+use crate::cluster::Cluster;
+use crate::types::*;
 
 pub fn connected_components(triples: &[Triple]) -> Vec<Cluster> {
     let edge_ix = mk_edge_index(triples);
@@ -19,7 +18,8 @@ pub fn connected_components(triples: &[Triple]) -> Vec<Cluster> {
             for node in prev_nodes.iter() {
                 for edge in node.edges() {
                     for nn in edge_ix.get(&edge).unwrap() {
-                        if !component.contains(*nn) && !prev_nodes.contains(*nn) {
+                        if !component.contains(*nn) && !prev_nodes.contains(*nn)
+                        {
                             new_nodes.insert(**nn);
                         }
                     }

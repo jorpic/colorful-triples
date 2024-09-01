@@ -1,5 +1,5 @@
-use std::collections::BTreeMap;
 use crate::types::*;
+use std::collections::BTreeMap;
 
 pub type EdgeIx<N> = BTreeMap<Edge, Vec<N>>;
 
@@ -33,4 +33,3 @@ where
     }
     res
 }
-

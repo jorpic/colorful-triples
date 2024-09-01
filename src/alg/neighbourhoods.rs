@@ -1,11 +1,10 @@
 use std::collections::BTreeSet;
 
-use crate::types::*;
 use crate::cluster::Cluster;
+use crate::types::*;
 
-use super::edge_index::*;
 use super::connected_components::*;
-
+use super::edge_index::*;
 
 pub struct NeighborhoodOptions {
     pub width: usize,
@@ -31,8 +30,11 @@ pub fn tight_neighborhoods<'a>(
         .flatten()
 }
 
-
-fn edge_neighborhood(center: Edge, edge_ix: &EdgeIx<&Cluster>, width: usize) -> Cluster {
+fn edge_neighborhood(
+    center: Edge,
+    edge_ix: &EdgeIx<&Cluster>,
+    width: usize,
+) -> Cluster {
     let mut subgraph_nodes = BTreeSet::new();
     let mut subgraph_edges = BTreeSet::new();
     let mut prev_edges = BTreeSet::new();

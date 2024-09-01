@@ -17,7 +17,9 @@ impl Node for Triple {
     }
 }
 
-#[derive(Clone, Debug, Default, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[derive(
+    Clone, Debug, Default, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize,
+)]
 pub struct Cluster {
     pub nodes: BTreeSet<Triple>,
     pub base: BTreeSet<Triple>,
@@ -75,8 +77,8 @@ impl Cluster {
     }
 
     fn get_base<'a, T>(triples: T) -> BTreeSet<Triple>
-        where
-            T: IntoIterator<Item = &'a Triple>,
+    where
+        T: IntoIterator<Item = &'a Triple>,
     {
         let mut base = BTreeSet::new();
         let mut used_edges = BTreeSet::new();
@@ -91,12 +93,14 @@ impl Cluster {
         base
     }
 
-
     pub fn merge_with(&mut self, b: &Cluster) {
         self.add_triples(&b.nodes)
     }
 
-    pub fn inner_edges(&self, global_weights: &BTreeMap<Edge, usize>) -> BTreeSet<Edge> {
+    pub fn inner_edges(
+        &self,
+        global_weights: &BTreeMap<Edge, usize>,
+    ) -> BTreeSet<Edge> {
         self.edge_weights
             .iter()
             .filter(|(e, w)| global_weights.get(e).unwrap() <= *w)

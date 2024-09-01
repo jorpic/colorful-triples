@@ -1,6 +1,6 @@
-use std::collections::BTreeSet;
-use crate::cluster::{Cluster, ClusterId};
 use super::edge_index::*;
+use crate::cluster::{Cluster, ClusterId};
+use std::collections::BTreeSet;
 
 pub struct JoinNodesOptions {
     pub min_edge_weight: usize,
@@ -9,7 +9,7 @@ pub struct JoinNodesOptions {
 
 pub fn join_weak_nodes(
     clusters: &[Cluster],
-    opt: &JoinNodesOptions
+    opt: &JoinNodesOptions,
 ) -> Vec<Cluster> {
     let mut clusters = clusters.to_vec();
     loop {
@@ -62,5 +62,3 @@ fn join_weak_nodes_single_pass(
         .cloned()
         .collect()
 }
-
-

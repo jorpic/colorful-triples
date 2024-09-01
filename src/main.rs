@@ -1,8 +1,8 @@
 #![feature(portable_simd)]
 use std::cmp;
-use std::fs::File;
-use std::io::{BufWriter, Write, stdout};
 use std::collections::BTreeSet;
+use std::fs::File;
+use std::io::{stdout, BufWriter, Write};
 use thousands::Separable;
 
 mod alg;
@@ -11,13 +11,14 @@ mod cluster;
 mod triples;
 mod types;
 
-use types::*;
-use triples::pythagorean_triples;
+use alg::edge_index::{mk_edge_index, mk_edge_weights};
+use alg::neighbourhoods::{
+    drop_weak_nodes, tight_neighborhoods, NeighborhoodOptions,
+};
 use brute_force::fast_brute_force;
 use cluster::Cluster;
-use alg::edge_index::{mk_edge_index, mk_edge_weights};
-use alg::neighbourhoods::{NeighborhoodOptions, tight_neighborhoods, drop_weak_nodes};
-
+use triples::pythagorean_triples;
+use types::*;
 
 fn main() -> anyhow::Result<()> {
     let triples = pythagorean_triples(7825);
@@ -66,7 +67,11 @@ fn main() -> anyhow::Result<()> {
 
             let tight_clusters = get_tight_clusters(
                 &hgraph,
-                &NeighborhoodOptions {width: 3, min_weight});
+                &NeighborhoodOptions {
+                    width: 3,
+                    min_weight,
+                },
+            );
 
             if tight_clusters.len() == 0 {
                 break;
@@ -90,7 +95,8 @@ fn main() -> anyhow::Result<()> {
 
     println!(
         "remaining triples = {}",
-        hgraph.iter().map(|c| c.nodes.len()).sum::<usize>());
+        hgraph.iter().map(|c| c.nodes.len()).sum::<usize>()
+    );
 
     println!(
         "clusters = {}, triples in clusters = {}",
@@ -98,18 +104,14 @@ fn main() -> anyhow::Result<()> {
         clusters.iter().map(|c| c.nodes.len()).sum::<usize>(),
     );
 
-    clusters.sort_by_key(
-        |c| (
-            cmp::Reverse(c.base.len()),
-            cmp::Reverse(c.nodes.len()),
-        )
-    );
-
+    clusters.sort_by_key(|c| {
+        (cmp::Reverse(c.base.len()), cmp::Reverse(c.nodes.len()))
+    });
 
     let mut new_clusters: Vec<Cluster> = vec![];
     {
-        let free_triples: Vec<Triple> = hgraph
-            .into_iter().flat_map(|c| c.nodes).collect();
+        let free_triples: Vec<Triple> =
+            hgraph.into_iter().flat_map(|c| c.nodes).collect();
         let free_triples_ix = mk_edge_index(&free_triples);
         let mut used_triples: BTreeSet<Triple> = BTreeSet::new();
 
@@ -127,7 +129,7 @@ fn main() -> anyhow::Result<()> {
                             continue;
                         }
                         if t.iter().any(|x| used_edges.contains(x)) {
-                            continue
+                            continue;
                         }
                         for x in *t {
                             used_edges.insert(*x);
@@ -201,7 +203,7 @@ fn main() -> anyhow::Result<()> {
                 &c.base,
                 &c.nodes.difference(&c.base).cloned().collect()
             )
-                .separate_with_commas(),
+            .separate_with_commas(),
             now.elapsed()
         );
     }
@@ -209,29 +211,33 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn get_tight_clusters(clusters: &[Cluster], opts: &NeighborhoodOptions) -> Vec<Cluster> {
+fn get_tight_clusters(
+    clusters: &[Cluster],
+    opts: &NeighborhoodOptions,
+) -> Vec<Cluster> {
     let global_edge_ix = mk_edge_index(clusters);
 
     let mut nhs = tight_neighborhoods(&global_edge_ix, opts)
-        .filter(|c|
+        .filter(|c| {
             c.edge_weights.len() <= 42
                 && 25 <= c.nodes.len()
                 && c.edge_weights.len() == c.base.len() * 3
-        )
+        })
         .collect::<Vec<_>>();
 
-    nhs.sort_by_key(|c: &Cluster| (
-        cmp::Reverse(c.base.len()),
-        cmp::Reverse(c.nodes.len()),
-        c.edge_weights.len()
-    ));
+    nhs.sort_by_key(|c: &Cluster| {
+        (
+            cmp::Reverse(c.base.len()),
+            cmp::Reverse(c.nodes.len()),
+            c.edge_weights.len(),
+        )
+    });
 
     let mut used_edges = BTreeSet::new();
     let mut res = vec![];
     for c in nhs {
-        let has_intersection = c.edge_weights.keys().any(
-            |e| used_edges.contains(e)
-        );
+        let has_intersection =
+            c.edge_weights.keys().any(|e| used_edges.contains(e));
 
         if !has_intersection {
             for e in c.edge_weights.keys() {
