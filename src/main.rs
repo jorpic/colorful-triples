@@ -45,11 +45,11 @@ fn main() -> anyhow::Result<()> {
     //        let inner_edges = c.inner_edges(&global_edge_weights).len();
     //        if inner_edges > 5 {
     //            println!(
-    //                "innr triples={} edges={} inner_edges={} base={}",
+    //                "innr triples={} edges={} inner_edges={} cover={}",
     //                c.nodes.len(),
     //                c.edge_weights.len(),
     //                inner_edges,
-    //                c.base.len(),
+    //                c.cover.len(),
     //            );
     //            clusters.push(c);
     //        } else {
@@ -61,7 +61,7 @@ fn main() -> anyhow::Result<()> {
     //    hgraph = ts;
     //}
 
-    for min_weight in [3] {
+    for min_weight in [3, 2] {
         loop {
             println!();
 
@@ -79,12 +79,12 @@ fn main() -> anyhow::Result<()> {
 
             for tc in tight_clusters {
                 println!(
-                    "mw={} triples={} edges={} inner_edges={} base={}",
+                    "mw={} triples={} edges={} inner_edges={} cover={}",
                     min_weight,
                     tc.nodes.len(),
                     tc.edge_weights.len(),
                     tc.inner_edges(&global_edge_weights).len(),
-                    tc.base.len(),
+                    tc.cover.len(),
                 );
 
                 hgraph.retain(|c| c.nodes.is_disjoint(&tc.nodes));
@@ -104,8 +104,10 @@ fn main() -> anyhow::Result<()> {
         clusters.iter().map(|c| c.nodes.len()).sum::<usize>(),
     );
 
+    return Ok(());
+
     clusters.sort_by_key(|c| {
-        (cmp::Reverse(c.base.len()), cmp::Reverse(c.nodes.len()))
+        (cmp::Reverse(c.cover.len()), cmp::Reverse(c.nodes.len()))
     });
 
     let mut new_clusters: Vec<Cluster> = vec![];
@@ -162,10 +164,10 @@ fn main() -> anyhow::Result<()> {
                     }
                     let cc = Cluster::from_triples(companion);
                     println!(
-                        "comp triples={} edges={} base={}",
+                        "comp triples={} edges={} cover={}",
                         cc.nodes.len(),
                         cc.edge_weights.len(),
-                        cc.base.len(),
+                        cc.cover.len(),
                     );
                     new_clusters.push(cc);
                 } else {
@@ -187,10 +189,10 @@ fn main() -> anyhow::Result<()> {
 
     for c in &clusters {
         print!(
-            "triples={} edges={} base={} inner_edges={} ",
+            "triples={} edges={} cover={} inner_edges={} ",
             c.nodes.len(),
             c.edge_weights.len(),
-            c.base.len(),
+            c.cover.len(),
             c.inner_edges(&global_edge_weights).len(),
         );
 
@@ -200,8 +202,8 @@ fn main() -> anyhow::Result<()> {
         println!(
             "solutions={} elapsed={:.2?}",
             fast_brute_force(
-                &c.base,
-                &c.nodes.difference(&c.base).cloned().collect()
+                &c.cover,
+                &c.nodes.difference(&c.cover).cloned().collect()
             )
             .separate_with_commas(),
             now.elapsed()
@@ -218,21 +220,31 @@ fn get_tight_clusters(
     let global_edge_ix = mk_edge_index(clusters);
 
     let mut nhs = tight_neighborhoods(&global_edge_ix, opts)
+        .map(|c| {
+            // FIXME: shrink cover and drop uncovered triples
+            let cover: BTreeSet<Triple> =
+                c.cover.iter().take(14).cloned().collect();
+            let covered_edges: BTreeSet<Edge> =
+                cover.iter().flatten().cloned().collect();
+            let nodes: BTreeSet<Triple> = c.nodes
+                .iter()
+                .filter(|t| t.iter().all(|e| covered_edges.contains(e)))
+                .cloned()
+                .collect();
+            Cluster::from_cover(cover, nodes)
+        })
         .filter(|c| {
-            c.edge_weights.len() <= 42
-                && 25 <= c.nodes.len()
-                && c.edge_weights.len() == c.base.len() * 3
+            26 <= c.nodes.len()
+                && c.edge_weights.len() == c.cover.len() * 3
         })
         .collect::<Vec<_>>();
 
+    // Prefer more nodes but smaller cover
     nhs.sort_by_key(|c: &Cluster| {
-        (
-            cmp::Reverse(c.base.len()),
-            cmp::Reverse(c.nodes.len()),
-            c.edge_weights.len(),
-        )
+        (cmp::Reverse(c.nodes.len()), c.cover.len())
     });
 
+    // Select nonintersecting clusters
     let mut used_edges = BTreeSet::new();
     let mut res = vec![];
     for c in nhs {

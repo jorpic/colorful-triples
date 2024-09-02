@@ -2,6 +2,7 @@ use serde::Serialize;
 use std::collections::{btree_map, btree_set};
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::alg::exact_cover::*;
 use crate::types::*;
 
 impl Node for Triple {
@@ -22,7 +23,7 @@ impl Node for Triple {
 )]
 pub struct Cluster {
     pub nodes: BTreeSet<Triple>,
-    pub base: BTreeSet<Triple>,
+    pub cover: BTreeSet<Triple>,
     pub edge_weights: BTreeMap<Edge, usize>,
 }
 
@@ -59,10 +60,29 @@ impl Cluster {
         res
     }
 
+    pub fn from_cover(
+        cover: BTreeSet<Triple>,
+        nodes: BTreeSet<Triple>
+    ) -> Self {
+        let mut c = Cluster::default();
+        for triple in &nodes {
+            for edge in triple.edges() {
+                c.edge_weights
+                    .entry(edge)
+                    .and_modify(|weight| *weight += 1)
+                    .or_insert(1);
+            }
+        }
+        c.nodes = nodes;
+        c.cover = cover;
+        c
+    }
+
     fn add_triples<'a, T>(&mut self, triples: T)
     where
         T: IntoIterator<Item = &'a Triple>,
     {
+        let mut triples_clone = vec![];
         for triple in triples {
             for edge in triple.edges() {
                 self.edge_weights
@@ -71,26 +91,10 @@ impl Cluster {
                     .or_insert(1);
             }
             self.nodes.insert(*triple);
+            triples_clone.push(*triple);
         }
 
-        self.base = Cluster::get_base(&self.nodes);
-    }
-
-    fn get_base<'a, T>(triples: T) -> BTreeSet<Triple>
-    where
-        T: IntoIterator<Item = &'a Triple>,
-    {
-        let mut base = BTreeSet::new();
-        let mut used_edges = BTreeSet::new();
-        for t in triples {
-            if !t.iter().any(|e| used_edges.contains(e)) {
-                for e in t {
-                    used_edges.insert(*e);
-                }
-                base.insert(*t);
-            }
-        }
-        base
+        self.cover = exact_cover(13, &triples_clone).into_iter().collect();
     }
 
     pub fn merge_with(&mut self, b: &Cluster) {
