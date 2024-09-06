@@ -11,7 +11,7 @@ mod cluster;
 mod triples;
 mod types;
 
-use alg::edge_index::{mk_edge_index, mk_edge_weights};
+use alg::edge_index::*;
 use alg::neighbourhoods::{
     drop_weak_nodes, tight_neighborhoods, NeighborhoodOptions,
 };
@@ -81,45 +81,18 @@ fn main() -> anyhow::Result<()> {
         for c in clusters {
             loop {
                 let free_triples_ix = mk_edge_index(&free_triples);
-                let cover_candidates: BTreeSet<Triple> = c
-                    .edges()
-                    .flat_map(|e| free_triples_ix.get(&e))
-                    .flatten()
-                    .cloned()
-                    .collect();
-
-                let mut cover_triples = BTreeSet::new();
-                let mut covered_edges = BTreeSet::new();
-                for t in cover_candidates {
-                    if t.iter().any(|e| covered_edges.contains(e)) {
-                        continue;
-                    }
-                    t.iter().for_each(|e| {
-                        covered_edges.insert(*e);
-                    });
-                    cover_triples.insert(t);
-                    if cover_triples.len() == 14 {
-                        break;
-                    }
-                }
-
-                if cover_triples.len() < 14 {
+                let cc = mk_companion_cluster(&c, &free_triples_ix);
+                if cc.cover.len() < 12 {
                     break;
                 }
 
-                free_triples.retain(|t| !cover_triples.contains(t));
+                free_triples.retain(|t| !cc.nodes.contains(t));
 
-                let cc =
-                    Cluster::from_cover(cover_triples.clone(), cover_triples);
                 println!(
-                    "triples={} edges={} cover={} extra_triples={}",
+                    "triples={} edges={} cover={}", 
                     cc.nodes.len(),
                     cc.edge_weights.len(),
                     cc.cover.len(),
-                    free_triples
-                        .iter()
-                        .filter(|t| t.iter().all(|e| covered_edges.contains(e)))
-                        .count()
                 );
                 new_clusters.push(cc);
             }
@@ -167,6 +140,59 @@ fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+fn mk_companion_cluster(
+    c: &Cluster,
+    free_triples_ix: &EdgeIx<Triple>
+) -> Cluster {
+    let mut cover: BTreeSet<Triple> = BTreeSet::new();
+    let mut covered_edges: BTreeSet<Edge> = BTreeSet::new();
+
+    let empty = vec![];
+    let free_and_adjacent_to = |e: Edge| free_triples_ix.get(&e).unwrap_or(&empty);
+    let touches = |edges: &BTreeSet<Edge>, t: &Triple| t.iter().any(|e| edges.contains(e));
+    let disjoint = |a: &Triple, b: &Triple| a.iter().all(|x| b.iter().all(|y| x != y));
+
+    for t in &c.cover {
+        'out: for a in free_and_adjacent_to(t[0]) {
+            if touches(&covered_edges, a) {
+                continue;
+            }
+            for b in free_and_adjacent_to(t[1]) {
+                if touches(&covered_edges, b) || !disjoint(a, b) {
+                    continue;
+                }
+                for c in free_and_adjacent_to(t[2]) {
+                    if touches(&covered_edges, c) || !disjoint(a, c) || !disjoint(b, c) {
+                        continue;
+                    }
+
+                    a.iter().for_each(|e| { covered_edges.insert(*e); } );
+                    b.iter().for_each(|e| { covered_edges.insert(*e); } );
+                    c.iter().for_each(|e| { covered_edges.insert(*e); } );
+                    cover.insert(*a);
+                    cover.insert(*b);
+                    cover.insert(*c);
+                    break 'out;
+                }
+            }
+        }
+
+        if cover.len() == 12 {
+            break;
+        }
+    }
+
+    let triples = covered_edges
+        .iter()
+        .flat_map(|e| free_triples_ix.get(e))
+        .flatten()
+        .filter(|t| t.iter().all(|e| covered_edges.contains(e)))
+        .cloned()
+        .collect();
+
+    Cluster::from_cover(cover, triples)
 }
 
 fn get_tight_clusters(
