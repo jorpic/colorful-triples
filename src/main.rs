@@ -81,7 +81,7 @@ fn main() -> anyhow::Result<()> {
         for c in clusters {
             loop {
                 let free_triples_ix = mk_edge_index(&free_triples);
-                let cover_candidates: BTreeSet<&Triple> = c
+                let cover_candidates: BTreeSet<Triple> = c
                     .edges()
                     .flat_map(|e| free_triples_ix.get(&e))
                     .flatten()
@@ -94,8 +94,8 @@ fn main() -> anyhow::Result<()> {
                     if t.iter().any(|e| covered_edges.contains(e)) {
                         continue;
                     }
-                    cover_triples.insert(*t);
                     t.iter().for_each(|e| { covered_edges.insert(*e); });
+                    cover_triples.insert(t);
                     if cover_triples.len() == 14 {
                         break;
                     }

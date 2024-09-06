@@ -12,7 +12,7 @@ pub struct NeighborhoodOptions {
 }
 
 pub fn tight_neighborhoods<'a>(
-    edge_ix: &'a EdgeIx<&'a Cluster>,
+    edge_ix: &'a EdgeIx<Cluster>,
     opt: &'a NeighborhoodOptions,
 ) -> impl Iterator<Item = Cluster> + 'a {
     edge_ix
@@ -32,7 +32,7 @@ pub fn tight_neighborhoods<'a>(
 
 fn edge_neighborhood(
     center: Edge,
-    edge_ix: &EdgeIx<&Cluster>,
+    edge_ix: &EdgeIx<Cluster>,
     width: usize,
 ) -> Cluster {
     let mut subgraph_nodes = BTreeSet::new();
