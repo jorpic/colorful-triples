@@ -62,7 +62,7 @@ impl Cluster {
 
     pub fn from_cover(
         cover: BTreeSet<Triple>,
-        nodes: BTreeSet<Triple>
+        nodes: BTreeSet<Triple>,
     ) -> Self {
         let mut c = Cluster::default();
         for triple in &nodes {

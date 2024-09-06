@@ -1,6 +1,6 @@
 #![feature(portable_simd)]
 use std::cmp;
-use std::collections::{BTreeSet, BTreeMap};
+use std::collections::BTreeSet;
 use std::fs::File;
 use std::io::{stdout, BufWriter, Write};
 use thousands::Separable;
@@ -94,7 +94,9 @@ fn main() -> anyhow::Result<()> {
                     if t.iter().any(|e| covered_edges.contains(e)) {
                         continue;
                     }
-                    t.iter().for_each(|e| { covered_edges.insert(*e); });
+                    t.iter().for_each(|e| {
+                        covered_edges.insert(*e);
+                    });
                     cover_triples.insert(t);
                     if cover_triples.len() == 14 {
                         break;
@@ -107,7 +109,8 @@ fn main() -> anyhow::Result<()> {
 
                 free_triples.retain(|t| !cover_triples.contains(t));
 
-                let cc = Cluster::from_cover(cover_triples.clone(), cover_triples);
+                let cc =
+                    Cluster::from_cover(cover_triples.clone(), cover_triples);
                 println!(
                     "triples={} edges={} cover={} extra_triples={}",
                     cc.nodes.len(),
@@ -166,7 +169,6 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-
 fn get_tight_clusters(
     clusters: &[Cluster],
     opts: &NeighborhoodOptions,
@@ -181,7 +183,8 @@ fn get_tight_clusters(
                 c.cover.iter().take(14).cloned().collect();
             let covered_edges: BTreeSet<Edge> =
                 cover.iter().flatten().cloned().collect();
-            let nodes: BTreeSet<Triple> = c.nodes
+            let nodes: BTreeSet<Triple> = c
+                .nodes
                 .iter()
                 .filter(|t| t.iter().all(|e| covered_edges.contains(e)))
                 .cloned()
@@ -189,16 +192,12 @@ fn get_tight_clusters(
             Cluster::from_cover(cover, nodes)
         })
         .filter(|c| {
-            25 <= c.nodes.len()
-                && c.edge_weights.len() == c.cover.len() * 3
+            25 <= c.nodes.len() && c.edge_weights.len() == c.cover.len() * 3
         })
         .collect::<Vec<_>>();
 
     // Prefer more nodes but smaller cover
-    nhs.sort_by_key(|c: &Cluster| {
-        (cmp::Reverse(c.nodes.len()),
-        c.cover.len())
-    });
+    nhs.sort_by_key(|c: &Cluster| (cmp::Reverse(c.nodes.len()), c.cover.len()));
 
     // Select nonintersecting clusters
     let mut used_edges = BTreeSet::new();
