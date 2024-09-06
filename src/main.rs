@@ -1,6 +1,6 @@
 #![feature(portable_simd)]
 use std::cmp;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, BTreeMap};
 use std::fs::File;
 use std::io::{stdout, BufWriter, Write};
 use thousands::Separable;
@@ -27,39 +27,6 @@ fn main() -> anyhow::Result<()> {
     let global_edge_weights = mk_edge_weights(&hgraph);
     let mut hgraph = drop_weak_nodes(hgraph, 2);
     let mut clusters: Vec<Cluster> = vec![];
-
-    //for min_edge_weight in 3..19 {
-    //    hgraph = join_weak_nodes(
-    //        &hgraph,
-    //        &JoinNodesOptions {min_edge_weight, max_edges: 41});
-    //
-    //    println!(
-    //        "nodes after joining with min_edge_weight={}: {}",
-    //        min_edge_weight,
-    //        hgraph.len());
-    //}
-    //
-    //{
-    //    let mut ts: Vec<Cluster> = vec![];
-    //    for c in hgraph {
-    //        let inner_edges = c.inner_edges(&global_edge_weights).len();
-    //        if inner_edges > 5 {
-    //            println!(
-    //                "innr triples={} edges={} inner_edges={} cover={}",
-    //                c.nodes.len(),
-    //                c.edge_weights.len(),
-    //                inner_edges,
-    //                c.cover.len(),
-    //            );
-    //            clusters.push(c);
-    //        } else {
-    //            for t in &c.nodes {
-    //                ts.push(Cluster::from_triples([t]));
-    //            }
-    //        }
-    //    }
-    //    hgraph = ts;
-    //}
 
     for min_weight in [3, 2] {
         loop {
@@ -104,81 +71,67 @@ fn main() -> anyhow::Result<()> {
         clusters.iter().map(|c| c.nodes.len()).sum::<usize>(),
     );
 
-    return Ok(());
+    clusters.sort_by_key(|c| cmp::Reverse(c.nodes.len()));
 
-    clusters.sort_by_key(|c| {
-        (cmp::Reverse(c.cover.len()), cmp::Reverse(c.nodes.len()))
-    });
-
-    let mut new_clusters: Vec<Cluster> = vec![];
-    {
-        let free_triples: Vec<Triple> =
+    let clusters = {
+        let mut free_triples: Vec<Triple> =
             hgraph.into_iter().flat_map(|c| c.nodes).collect();
-        let free_triples_ix = mk_edge_index(&free_triples);
-        let mut used_triples: BTreeSet<Triple> = BTreeSet::new();
 
+        let mut new_clusters: Vec<Cluster> = vec![];
         for c in clusters {
-            println!();
             loop {
-                let mut companion = vec![];
-                let mut used_edges: BTreeSet<Edge> = BTreeSet::new();
-                for e in c.edges() {
-                    let Some(ts) = free_triples_ix.get(&e) else {
+                let free_triples_ix = mk_edge_index(&free_triples);
+                let cover_candidates: BTreeSet<&Triple> = c
+                    .edges()
+                    .flat_map(|e| free_triples_ix.get(&e))
+                    .flatten()
+                    .cloned()
+                    .collect();
+
+                let mut cover_triples = BTreeSet::new();
+                let mut covered_edges = BTreeSet::new();
+                for t in cover_candidates {
+                    if t.iter().any(|e| covered_edges.contains(e)) {
                         continue;
-                    };
-                    for t in ts {
-                        if used_triples.contains(*t) {
-                            continue;
-                        }
-                        if t.iter().any(|x| used_edges.contains(x)) {
-                            continue;
-                        }
-                        for x in *t {
-                            used_edges.insert(*x);
-                        }
-                        companion.push(*t);
-                        break;
                     }
-                    if companion.len() >= 13 {
+                    cover_triples.insert(*t);
+                    t.iter().for_each(|e| { covered_edges.insert(*e); });
+                    if cover_triples.len() == 14 {
                         break;
                     }
                 }
-                if companion.len() >= 13 {
-                    for t in &companion {
-                        used_triples.insert(**t);
-                    }
-                    // Add more triples
-                    for e in &used_edges {
-                        let Some(ts) = free_triples_ix.get(e) else {
-                            continue;
-                        };
-                        for t in ts {
-                            if used_triples.contains(*t) {
-                                continue;
-                            }
-                            if t.iter().all(|x| used_edges.contains(x)) {
-                                used_triples.insert(**t);
-                                companion.push(*t);
-                            }
-                        }
-                    }
-                    let cc = Cluster::from_triples(companion);
-                    println!(
-                        "comp triples={} edges={} cover={}",
-                        cc.nodes.len(),
-                        cc.edge_weights.len(),
-                        cc.cover.len(),
-                    );
-                    new_clusters.push(cc);
-                } else {
-                    break; // can't make good companion
+
+                if cover_triples.len() < 14 {
+                    break;
                 }
+
+                free_triples.retain(|t| !cover_triples.contains(t));
+
+                let cc = Cluster::from_cover(cover_triples.clone(), cover_triples);
+                println!(
+                    "triples={} edges={} cover={} extra_triples={}",
+                    cc.nodes.len(),
+                    cc.edge_weights.len(),
+                    cc.cover.len(),
+                    free_triples
+                        .iter()
+                        .filter(|t| t.iter().all(|e| covered_edges.contains(e)))
+                        .count()
+                );
+                new_clusters.push(cc);
             }
+            println!();
             new_clusters.push(c);
         }
-    }
 
-    let clusters = new_clusters;
+        println!("remaining triples = {}", free_triples.len());
+        println!(
+            "clusters = {}, triples in clusters = {}",
+            new_clusters.len(),
+            new_clusters.iter().map(|c| c.nodes.len()).sum::<usize>(),
+        );
+        new_clusters
+    };
 
     {
         let file = File::create("clusters.json")?;
@@ -213,6 +166,7 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+
 fn get_tight_clusters(
     clusters: &[Cluster],
     opts: &NeighborhoodOptions,
@@ -221,7 +175,8 @@ fn get_tight_clusters(
 
     let mut nhs = tight_neighborhoods(&global_edge_ix, opts)
         .map(|c| {
-            // FIXME: shrink cover and drop uncovered triples
+            // Shrink cover and drop uncovered triples.
+            // FIXME: Try to order nodes by weight before shrinking.
             let cover: BTreeSet<Triple> =
                 c.cover.iter().take(14).cloned().collect();
             let covered_edges: BTreeSet<Edge> =
@@ -234,14 +189,15 @@ fn get_tight_clusters(
             Cluster::from_cover(cover, nodes)
         })
         .filter(|c| {
-            26 <= c.nodes.len()
+            25 <= c.nodes.len()
                 && c.edge_weights.len() == c.cover.len() * 3
         })
         .collect::<Vec<_>>();
 
     // Prefer more nodes but smaller cover
     nhs.sort_by_key(|c: &Cluster| {
-        (cmp::Reverse(c.nodes.len()), c.cover.len())
+        (cmp::Reverse(c.nodes.len()),
+        c.cover.len())
     });
 
     // Select nonintersecting clusters
