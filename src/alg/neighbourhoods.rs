@@ -18,13 +18,12 @@ pub fn tight_neighborhoods<'a>(
     edge_ix
         .keys()
         .map(move |edge| edge_neighborhood(*edge, edge_ix, opt.width))
-        .filter_map(move |cluster| {
-            let triples = drop_weak_nodes(cluster.triples(), opt.min_weight);
-            if triples.is_empty() {
+        .filter_map(move |triples| {
+            let strong_triples = drop_weak_nodes(triples, opt.min_weight);
+            if strong_triples.is_empty() {
                 None
             } else {
-                // Some([Cluster::from_triples(&triples)])
-                Some(connected_components(&triples))
+                Some(connected_components(&strong_triples))
             }
         })
         .flatten()
@@ -34,7 +33,7 @@ fn edge_neighborhood(
     center: Edge,
     edge_ix: &EdgeIx<Cluster>,
     width: usize,
-) -> Cluster {
+) -> Vec<Triple> {
     let mut subgraph_nodes = BTreeSet::new();
     let mut subgraph_edges = BTreeSet::new();
     let mut prev_edges = BTreeSet::new();
@@ -44,11 +43,6 @@ fn edge_neighborhood(
     for _w in 0..width {
         for e in &prev_edges {
             for n in edge_ix.get(e).unwrap() {
-                // NB: We are skipping large clusters here
-                // to prevent NH explosion!
-                if n.edge_weights.len() > 20 {
-                    continue;
-                }
                 if subgraph_nodes.insert(n) {
                     n.edges().for_each(|new_edge| {
                         let is_new_edge = e != &new_edge
@@ -66,7 +60,11 @@ fn edge_neighborhood(
         prev_edges.append(&mut new_edges); // new_edges is empty now
     }
 
-    Cluster::from_triples(subgraph_nodes.iter().flat_map(|n| &n.nodes))
+    subgraph_nodes
+        .into_iter()
+        .flat_map(|n| &n.nodes)
+        .cloned()
+        .collect()
 }
 
 // Weak node is a node that is connected to a weak edge.

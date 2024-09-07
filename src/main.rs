@@ -89,7 +89,7 @@ fn main() -> anyhow::Result<()> {
                 free_triples.retain(|t| !cc.nodes.contains(t));
 
                 println!(
-                    "triples={} edges={} cover={}", 
+                    "triples={} edges={} cover={}",
                     cc.nodes.len(),
                     cc.edge_weights.len(),
                     cc.cover.len(),
@@ -144,15 +144,19 @@ fn main() -> anyhow::Result<()> {
 
 fn mk_companion_cluster(
     c: &Cluster,
-    free_triples_ix: &EdgeIx<Triple>
+    free_triples_ix: &EdgeIx<Triple>,
 ) -> Cluster {
     let mut cover: BTreeSet<Triple> = BTreeSet::new();
     let mut covered_edges: BTreeSet<Edge> = BTreeSet::new();
 
     let empty = vec![];
-    let free_and_adjacent_to = |e: Edge| free_triples_ix.get(&e).unwrap_or(&empty);
-    let touches = |edges: &BTreeSet<Edge>, t: &Triple| t.iter().any(|e| edges.contains(e));
-    let disjoint = |a: &Triple, b: &Triple| a.iter().all(|x| b.iter().all(|y| x != y));
+    let free_and_adjacent_to =
+        |e: Edge| free_triples_ix.get(&e).unwrap_or(&empty);
+    let touches = |edges: &BTreeSet<Edge>, t: &Triple| {
+        t.iter().any(|e| edges.contains(e))
+    };
+    let disjoint =
+        |a: &Triple, b: &Triple| a.iter().all(|x| b.iter().all(|y| x != y));
 
     for t in &c.cover {
         'out: for a in free_and_adjacent_to(t[0]) {
@@ -164,13 +168,22 @@ fn mk_companion_cluster(
                     continue;
                 }
                 for c in free_and_adjacent_to(t[2]) {
-                    if touches(&covered_edges, c) || !disjoint(a, c) || !disjoint(b, c) {
+                    if touches(&covered_edges, c)
+                        || !disjoint(a, c)
+                        || !disjoint(b, c)
+                    {
                         continue;
                     }
 
-                    a.iter().for_each(|e| { covered_edges.insert(*e); } );
-                    b.iter().for_each(|e| { covered_edges.insert(*e); } );
-                    c.iter().for_each(|e| { covered_edges.insert(*e); } );
+                    a.iter().for_each(|e| {
+                        covered_edges.insert(*e);
+                    });
+                    b.iter().for_each(|e| {
+                        covered_edges.insert(*e);
+                    });
+                    c.iter().for_each(|e| {
+                        covered_edges.insert(*e);
+                    });
                     cover.insert(*a);
                     cover.insert(*b);
                     cover.insert(*c);
