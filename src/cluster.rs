@@ -40,13 +40,7 @@ impl Node for Cluster {
     }
 }
 
-pub type ClusterId = Triple;
-
 impl Cluster {
-    pub fn id(&self) -> ClusterId {
-        *self.nodes.first().unwrap()
-    }
-
     pub fn singleton(t: &Triple) -> Self {
         Cluster::from_triples([t])
     }
@@ -95,21 +89,6 @@ impl Cluster {
         }
 
         self.cover = exact_cover(13, &triples_clone).into_iter().collect();
-    }
-
-    pub fn merge_with(&mut self, b: &Cluster) {
-        self.add_triples(&b.nodes)
-    }
-
-    pub fn inner_edges(
-        &self,
-        global_weights: &BTreeMap<Edge, usize>,
-    ) -> BTreeSet<Edge> {
-        self.edge_weights
-            .iter()
-            .filter(|(e, w)| global_weights.get(e).unwrap() <= *w)
-            .map(|x| *x.0)
-            .collect()
     }
 }
 

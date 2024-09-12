@@ -24,7 +24,6 @@ fn main() -> anyhow::Result<()> {
     let triples = pythagorean_triples(7825);
 
     let hgraph: Vec<_> = triples.iter().map(Cluster::singleton).collect();
-    let global_edge_weights = mk_edge_weights(&hgraph);
     let mut hgraph = drop_weak_nodes(hgraph, 2);
     let mut clusters: Vec<Cluster> = vec![];
 
@@ -46,11 +45,10 @@ fn main() -> anyhow::Result<()> {
 
             for tc in tight_clusters {
                 println!(
-                    "mw={} triples={} edges={} inner_edges={} cover={}",
+                    "mw={} triples={} edges={} cover={}",
                     min_weight,
                     tc.nodes.len(),
                     tc.edge_weights.len(),
-                    tc.inner_edges(&global_edge_weights).len(),
                     tc.cover.len(),
                 );
 
@@ -109,20 +107,27 @@ fn main() -> anyhow::Result<()> {
         new_clusters
     };
 
-    {
-        let file = File::create("clusters.json")?;
-        let mut writer = BufWriter::new(file);
-        serde_json::to_writer(&mut writer, &clusters)?;
-        writer.flush()?;
-    }
 
-    for c in &clusters {
+    save_all(&clusters, "clusters.json")?;
+    solve_all(&clusters);
+
+    Ok(())
+}
+
+fn save_all(clusters: &[Cluster], file_name: &str) -> anyhow::Result<()> {
+    let file = File::create(file_name)?;
+    let mut writer = BufWriter::new(file);
+    serde_json::to_writer(&mut writer, &clusters)?;
+    Ok(writer.flush()?)
+}
+
+fn solve_all(clusters: &[Cluster]) {
+    for c in clusters {
         print!(
-            "triples={} edges={} cover={} inner_edges={} ",
+            "triples={} edges={} cover={} ",
             c.nodes.len(),
             c.edge_weights.len(),
             c.cover.len(),
-            c.inner_edges(&global_edge_weights).len(),
         );
 
         stdout().flush().unwrap();
@@ -138,8 +143,6 @@ fn main() -> anyhow::Result<()> {
             now.elapsed()
         );
     }
-
-    Ok(())
 }
 
 fn mk_companion_cluster(
