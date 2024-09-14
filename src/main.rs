@@ -15,6 +15,7 @@ use alg::edge_index::*;
 use alg::neighbourhoods::{
     drop_weak_nodes, tight_neighborhoods, NeighborhoodOptions,
 };
+use alg::join_weak_edges::*;
 use brute_force::fast_brute_force;
 use cluster::Cluster;
 use triples::pythagorean_triples;
@@ -26,8 +27,9 @@ fn main() -> anyhow::Result<()> {
     let hgraph: Vec<_> = triples.iter().map(Cluster::singleton).collect();
     let mut hgraph = drop_weak_nodes(hgraph, 2);
     let mut clusters: Vec<Cluster> = vec![];
+    let all_triples: Vec<Triple> = hgraph.iter().flat_map(|t| &t.nodes).cloned().collect();
 
-    for min_weight in [3, 2] {
+    for min_weight in [2] {
         loop {
             println!();
 
@@ -59,11 +61,6 @@ fn main() -> anyhow::Result<()> {
     }
 
     println!(
-        "remaining triples = {}",
-        hgraph.iter().map(|c| c.nodes.len()).sum::<usize>()
-    );
-
-    println!(
         "clusters = {}, triples in clusters = {}",
         clusters.len(),
         clusters.iter().map(|c| c.nodes.len()).sum::<usize>(),
@@ -71,41 +68,22 @@ fn main() -> anyhow::Result<()> {
 
     clusters.sort_by_key(|c| cmp::Reverse(c.nodes.len()));
 
-    let clusters = {
-        let mut free_triples: Vec<Triple> =
-            hgraph.into_iter().flat_map(|c| c.nodes).collect();
+    let free_triples: Vec<Triple> =
+        hgraph.into_iter().flat_map(|c| c.nodes).collect();
 
-        let mut new_clusters: Vec<Cluster> = vec![];
-        for c in clusters {
-            loop {
-                let free_triples_ix = mk_edge_index(&free_triples);
-                let cc = mk_companion_cluster(&c, &free_triples_ix);
-                if cc.cover.len() < 12 {
-                    break;
-                }
+    println!(
+        "remaining triples = {}",
+        free_triples.len(),
+    );
 
-                free_triples.retain(|t| !cc.nodes.contains(t));
+    let mini_clusters = join_weak_edges(&all_triples, &free_triples);
 
-                println!(
-                    "triples={} edges={} cover={}",
-                    cc.nodes.len(),
-                    cc.edge_weights.len(),
-                    cc.cover.len(),
-                );
-                new_clusters.push(cc);
-            }
-            println!();
-            new_clusters.push(c);
-        }
-
-        println!("remaining triples = {}", free_triples.len());
-        println!(
-            "clusters = {}, triples in clusters = {}",
-            new_clusters.len(),
-            new_clusters.iter().map(|c| c.nodes.len()).sum::<usize>(),
-        );
-        new_clusters
-    };
+    println!(
+        "1-clusters = {}, 2-clusters = {}, 3-clusters = {}",
+        mini_clusters.iter().filter(|c| c.triples.len() == 1).count(),
+        mini_clusters.iter().filter(|c| c.triples.len() == 2).count(),
+        mini_clusters.iter().filter(|c| c.triples.len() == 3).count(),
+    );
 
 
     save_all(&clusters, "clusters.json")?;
