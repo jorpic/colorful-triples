@@ -50,7 +50,7 @@ fn main() -> anyhow::Result<()> {
                     "mw={} triples={} edges={} cover={}",
                     min_weight,
                     tc.nodes.len(),
-                    tc.edge_weights.len(),
+                    tc.edges.len(),
                     tc.cover.len(),
                 );
 
@@ -104,7 +104,7 @@ fn solve_all(clusters: &[Cluster]) {
         print!(
             "triples={} edges={} cover={} ",
             c.nodes.len(),
-            c.edge_weights.len(),
+            c.edges.len(),
             c.cover.len(),
         );
 
@@ -212,7 +212,7 @@ fn get_tight_clusters(
             Cluster::from_cover(cover, nodes)
         })
         .filter(|c| {
-            25 <= c.nodes.len() && c.edge_weights.len() == c.cover.len() * 3
+            25 <= c.nodes.len() && c.edges.len() == c.cover.len() * 3
         })
         .collect::<Vec<_>>();
 
@@ -224,10 +224,10 @@ fn get_tight_clusters(
     let mut res = vec![];
     for c in nhs {
         let has_intersection =
-            c.edge_weights.keys().any(|e| used_edges.contains(e));
+            c.edges.iter().any(|e| used_edges.contains(e));
 
         if !has_intersection {
-            for e in c.edge_weights.keys() {
+            for e in &c.edges {
                 used_edges.insert(*e);
             }
             res.push(c);
