@@ -6,7 +6,7 @@ pub type EdgeIx<N> = BTreeMap<Edge, Vec<N>>;
 // Each vector in the Map will be ordered if the `nodes` is ordered.
 pub fn mk_edge_index<'a, N, I>(nodes: I) -> EdgeIx<N>
 where
-    N: Node + Clone + 'a,
+    N: HasIterableEdges + Clone + 'a,
     I: IntoIterator<Item = &'a N>,
 {
     let mut res: EdgeIx<N> = BTreeMap::new();
@@ -22,7 +22,7 @@ where
 
 pub fn mk_edge_weights<'a, N, I>(nodes: I) -> BTreeMap<Edge, usize>
 where
-    N: Node + 'a,
+    N: HasIterableEdges + 'a,
     I: IntoIterator<Item = &'a N>,
 {
     let mut res = BTreeMap::new();
