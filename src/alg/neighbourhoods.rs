@@ -32,22 +32,21 @@ fn edge_neighborhood(
 ) -> Vec<Constraint> {
     let mut subgraph_nodes: BTreeSet<Constraint> = BTreeSet::new();
     let mut subgraph_edges = BTreeSet::new();
-    let mut prev_edges = BTreeSet::new();
-    prev_edges.insert(center);
+    let mut prev_edges = BTreeSet::from([center]);
     let mut new_edges = BTreeSet::new();
 
     for _w in 0..width {
         for e in &prev_edges {
             for n in edge_ix.get(e).unwrap() {
                 if subgraph_nodes.insert(n.clone()) {
-                    n.edges().for_each(|new_edge| {
+                    for new_edge in n.edges() {
                         let is_new_edge = e != &new_edge
                             && !prev_edges.contains(&new_edge)
                             && !subgraph_edges.contains(&new_edge);
                         if is_new_edge {
                             new_edges.insert(new_edge);
                         }
-                    })
+                    }
                 }
             }
         }

@@ -12,9 +12,11 @@ mod brute_force;
 mod triples;
 mod types;
 
+use alg::exact_cover::exact_cover;
 use alg::neighbourhoods::{tight_neighborhoods, NeighborhoodOptions};
-use alg::weak_edges::join_weak_edges;
+use alg::weak_edges::{join_weak_edges, join_chains};
 use alg::weak_nodes::drop_weak_nodes;
+
 use brute_force::fast_brute_force;
 use triples::pythagorean_triples;
 use types::*;
@@ -27,8 +29,24 @@ fn main() -> anyhow::Result<()> {
     println!("without pendants = {}", triples.len());
 
     let constraints = triples.into_iter().map(Constraint::one).collect::<Vec<_>>();
-    let mut constraints = join_weak_edges(&constraints);
-    println!("weak edges joined = {}", constraints.len());
+
+    {
+        let all_edges = constraints.iter().flat_map(|c| c.edges.iter()).collect::<BTreeSet<_>>();
+        println!("all edges = {}", all_edges.len());
+    }
+
+    let constraints = join_weak_edges(&constraints, 3);
+    let constraints = join_weak_edges(&constraints, 2);
+    let mut constraints = join_chains(&constraints);
+
+    {
+        let strong_edges = constraints.iter().flat_map(|c| c.edges.iter()).collect::<BTreeSet<_>>();
+        println!(
+            "strong edges = {}, joined constraints = {}",
+            strong_edges.len(),
+            constraints.len(),
+        );
+    }
 
     {
         let mut stats = BTreeMap::new();
@@ -44,17 +62,17 @@ fn main() -> anyhow::Result<()> {
 
     let mut clusters: Vec<Cluster> = vec![];
 
-    for min_weight in [3, 2] {
+    for nh_min_weight in [3, 2] {
         loop {
             println!();
 
-            let tight_clusters = get_tight_clusters(
-                &constraints,
-                &NeighborhoodOptions {
-                    width: 3,
-                    min_weight,
-                },
-            );
+            let opts = TightOptions {
+                nh_min_weight,
+                cover_nodes: 14,
+                min_constraints: 25,
+            };
+
+            let tight_clusters = get_tight_clusters(&constraints, opts);
 
             if tight_clusters.is_empty() {
                 break;
@@ -63,7 +81,7 @@ fn main() -> anyhow::Result<()> {
             for tc in tight_clusters {
                 println!(
                     "mw={} triples={} edges={} cover={}",
-                    min_weight,
+                    nh_min_weight,
                     tc.nodes.len(),
                     tc.edges.len(),
                     tc.cover.len(),
@@ -73,13 +91,17 @@ fn main() -> anyhow::Result<()> {
                 clusters.push(tc);
             }
         }
-    }
 
-    println!(
-        "clusters = {}, triples in clusters = {}",
-        clusters.len(),
-        clusters.iter().map(|c| c.nodes.len()).sum::<usize>(),
-    );
+        let covered_edges = clusters.iter().flat_map(|c| c.edges.iter()).collect::<BTreeSet<_>>();
+        println!(
+            "clusters = {}, constraints in clusters = {}, covered_edges = {}, remaining constraints = {}",
+            clusters.len(),
+            clusters.iter().map(|c| c.nodes.len()).sum::<usize>(), // FIXME: don't count
+                                                                   // repititions
+            covered_edges.len(),
+            constraints.len(),
+        );
+    }
 
     clusters.sort_by_key(|c| cmp::Reverse(c.nodes.len()));
 
@@ -120,45 +142,59 @@ fn main() -> anyhow::Result<()> {
 //    }
 //}
 //
+
+
+struct TightOptions {
+    nh_min_weight: usize,
+    cover_nodes: usize,
+    min_constraints: usize,
+}
+
 fn get_tight_clusters(
     constraints: &[Constraint],
-    opts: &NeighborhoodOptions,
+    opts: TightOptions,
 ) -> Vec<Cluster> {
-    let mut nhs = tight_neighborhoods(constraints, opts)
-        .map(|c| {
-            // Shrink cover and drop uncovered triples.
-            // FIXME: Try to order nodes by weight before shrinking.
-            let cover: BTreeSet<Constraint> =
-                c.cover.iter().take(14).cloned().collect();
-            let covered_edges: BTreeSet<Edge> = cover
-                .iter()
-                .flat_map(|c| c.edges().collect::<Vec<_>>())
-                .collect();
-            let nodes: BTreeSet<Constraint> = c
-                .nodes
-                .iter()
-                .filter(|t| t.edges().all(|e| covered_edges.contains(&e)))
-                .cloned()
-                .collect();
-            // FIXME: store cover somewhere
-            Cluster::new(&nodes)
-        })
-        // FIXME: cover.len() * 3 is not correct
-        .filter(|c| 25 <= c.nodes.len() && c.edges.len() == c.cover.len() * 3)
-        .collect::<Vec<_>>();
+    let nh_opts = NeighborhoodOptions {
+        width: 3,
+        min_weight: opts.nh_min_weight,
+    };
+
+    let mut nhs = vec![];
+    for c in tight_neighborhoods(constraints, &nh_opts) {
+        // Shrink cover and drop uncovered triples.
+        // FIXME: Try to order nodes by weight before shrinking.
+        let nodes = c.nodes.iter().cloned().collect::<Vec<_>>();
+        let cover = exact_cover(opts.cover_nodes, &nodes);
+        let cover: BTreeSet<Constraint> =
+            cover.iter().take(opts.cover_nodes).cloned().collect();
+        let covered_edges: BTreeSet<Edge> = cover
+            .iter()
+            .flat_map(|c| c.edges().collect::<Vec<_>>())
+            .collect();
+        let nodes: BTreeSet<Constraint> = c
+            .nodes
+            .iter()
+            .filter(|t| t.edges().all(|e| covered_edges.contains(&e)))
+            .cloned()
+            .collect();
+
+        // FIXME: store cover somewhere
+        if opts.min_constraints <= c.nodes.len() && c.edges.len() == covered_edges.len() {
+            nhs.push(Cluster::new(&nodes));
+        }
+    }
 
     // Prefer more nodes but smaller cover.
     nhs.sort_by_key(|c: &Cluster| (cmp::Reverse(c.nodes.len()), c.cover.len()));
 
-    // Select nonintersecting clusters.
-    let mut used_edges = BTreeSet::new();
+    // Select disjoint clusters (i.e. not having common constraints).
+    // FIXME: selecting clusters with disjoint EDGES allegedly allows to cover more edges.
+    let mut used_constraints = BTreeSet::new();
     let mut res = vec![];
     for c in nhs {
-        let has_intersection = c.edges.iter().any(|e| used_edges.contains(e));
-
-        if !has_intersection {
-            for e in &c.edges {
-                used_edges.insert(*e);
+        if c.nodes.intersection(&used_constraints).count() < 10 {
+            for n in &c.nodes {
+                used_constraints.insert(n.clone());
             }
             res.push(c);
         }

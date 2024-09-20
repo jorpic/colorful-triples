@@ -1,31 +1,31 @@
-use crate::types::{Edge, Triple};
+use crate::types::{Edge, Constraint};
 use std::collections::BTreeSet;
 
 // Calculating exact cover is NP-complete.
 // Backtracking is too slow, greedy is too dumb.
 // We start greedy from different partial covers and choose best of results.
-pub fn exact_cover(max_size: usize, triples: &[Triple]) -> Vec<Triple> {
+pub fn exact_cover(max_size: usize, cs: &[Constraint]) -> Vec<Constraint> {
     let mut best_cover = vec![];
 
-    for i in 0..triples.len() {
-        let a = triples[i];
-        let a_edges: BTreeSet<Edge> = a.iter().cloned().collect();
-        for j in (i + 1)..triples.len() {
-            let b = triples[j];
-            let b_edges: BTreeSet<Edge> = b.iter().cloned().collect();
+    for i in 0..cs.len() {
+        let a = &cs[i];
+        let a_edges = a.edges.iter().cloned().collect::<BTreeSet<_>>();
+        for j in (i + 1)..cs.len() {
+            let b = &cs[j];
+            let b_edges = b.edges.iter().cloned().collect::<BTreeSet<_>>();
             if !b_edges.is_disjoint(&a_edges) {
                 continue;
             }
-            for k in (j + 1)..triples.len() {
-                let c = triples[k];
-                let c_edges: BTreeSet<Edge> = c.iter().cloned().collect();
+            for k in (j + 1)..cs.len() {
+                let c = &cs[k];
+                let c_edges = c.edges.iter().cloned().collect::<BTreeSet<_>>();
                 if !c_edges.is_disjoint(&a_edges)
                     || !c_edges.is_disjoint(&b_edges)
                 {
                     continue;
                 }
 
-                let cover = extend_greedily(vec![a, b, c], &triples[i + 1..]);
+                let cover = extend_greedily(vec![a.clone(), b.clone(), c.clone()], &cs[i + 1..]);
                 if max_size <= cover.len() {
                     return cover;
                 }
@@ -39,18 +39,18 @@ pub fn exact_cover(max_size: usize, triples: &[Triple]) -> Vec<Triple> {
     best_cover
 }
 
-fn extend_greedily(mut cover: Vec<Triple>, triples: &[Triple]) -> Vec<Triple> {
+fn extend_greedily(mut cover: Vec<Constraint>, cs: &[Constraint]) -> Vec<Constraint> {
     let mut used_edges: BTreeSet<Edge> =
-        cover.iter().flatten().cloned().collect();
+        cover.iter().flat_map(|c| &c.edges).cloned().collect();
 
-    for t in triples {
-        if t.iter().any(|e| used_edges.contains(e)) {
+    for c in cs {
+        if c.edges.iter().any(|e| used_edges.contains(e)) {
             continue;
         }
-        cover.push(*t);
-        t.iter().for_each(|e| {
+        cover.push(c.clone());
+        for e in &c.edges {
             used_edges.insert(*e);
-        });
+        }
     }
 
     cover

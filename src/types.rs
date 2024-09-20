@@ -7,6 +7,7 @@ pub type Triple = [Edge; 3];
 pub struct Constraint {
     pub triples: BTreeSet<Triple>,
     pub edges: Vec<Edge>,
+    pub captives: BTreeSet<Edge>,
 }
 
 impl Constraint {
@@ -14,18 +15,20 @@ impl Constraint {
         Constraint {
             triples: BTreeSet::from([t]),
             edges: t.into(),
+            captives: BTreeSet::new(),
         }
     }
 
-    pub fn with_captive(ts: &[Triple], captive: Edge) -> Self {
+    pub fn with_captives(ts: &[Triple], captives: BTreeSet<Edge>) -> Self {
         Constraint {
             triples: ts.iter().cloned().collect(),
             edges: ts
                 .iter()
                 .flatten()
                 .cloned()
-                .filter(|e| *e != captive)
+                .filter(|e| !captives.contains(e))
                 .collect(),
+            captives: captives,
         }
     }
 }
