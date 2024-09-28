@@ -1,7 +1,5 @@
-#![feature(portable_simd)]
-#![feature(impl_trait_in_assoc_type)]
+// #![feature(portable_simd)]
 
-use std::cmp;
 use std::collections::BTreeSet;
 //use std::fs::File;
 //use std::io::{stdout, BufWriter, Write};
@@ -45,7 +43,7 @@ fn main() -> anyhow::Result<()> {
         println!("all_claws = {}", all_claws.len());
 
         let mut new_clusters = 0;
-        let mut used_nodes = BTreeSet::new();
+        let mut used_nodes: BTreeSet<Node> = BTreeSet::new();
 
         'cluster: for c0 in &all_claws {
             let mut cluster = ClawCluster::new(c0.clone());
@@ -65,6 +63,7 @@ fn main() -> anyhow::Result<()> {
                         .flat_map(|e| edge_ix.get(e).unwrap())
                         .filter(|n| {
                             n.edges().all(|e| cluster.edges.contains(&e) || c1.edges.contains(&e))
+                                && !used_nodes.contains(n)
                                 && !cluster.nodes.contains(n)
                                 && !c1.nodes.contains(n)
                         })
@@ -102,9 +101,8 @@ fn main() -> anyhow::Result<()> {
 
         println!();
         nodes.retain(|n| !used_nodes.contains(n));
+        print_stats1(&nodes);
     }
-
-    print_stats1(&nodes);
 
     Ok(())
 }
