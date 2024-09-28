@@ -2,22 +2,19 @@
 #![feature(impl_trait_in_assoc_type)]
 
 use std::cmp;
-use std::collections::{BTreeMap, BTreeSet};
-use std::fs::File;
-use std::io::{stdout, BufWriter, Write};
-use thousands::Separable;
+use std::collections::BTreeSet;
+//use std::fs::File;
+//use std::io::{stdout, BufWriter, Write};
 
 mod alg;
-mod brute_force;
+// mod brute_force;
 mod triples;
 mod types;
 
-use alg::exact_cover::exact_cover;
-use alg::neighbourhoods::{tight_neighborhoods, NeighborhoodOptions};
-use alg::weak_edges::{join_weak_edges, join_chains};
+use alg::edge_index::{mk_edge_index, mk_edge_weights, EdgeIx};
+use alg::weak_edges::join_weak_edges;
 use alg::weak_nodes::drop_weak_nodes;
 
-use brute_force::fast_brute_force;
 use triples::pythagorean_triples;
 use types::*;
 
@@ -28,87 +25,156 @@ fn main() -> anyhow::Result<()> {
     let triples = drop_weak_nodes(triples, 2);
     println!("without pendants = {}", triples.len());
 
-    let constraints = triples.into_iter().map(Constraint::one).collect::<Vec<_>>();
+    let nodes: Vec<_> = triples.into_iter().map(Node::Triple).collect();
+    let nodes = join_weak_edges(&nodes, 3);
+    let nodes = join_weak_edges(&nodes, 2);
 
-    {
-        let all_edges = constraints.iter().flat_map(|c| c.edges.iter()).collect::<BTreeSet<_>>();
-        println!("all edges = {}", all_edges.len());
-    }
+    print_weak_edges(&nodes);
+    print_stats1(&nodes);
 
-    let constraints = join_weak_edges(&constraints, 3);
-    let constraints = join_weak_edges(&constraints, 2);
-    let mut constraints = join_chains(&constraints);
-
-    {
-        let strong_edges = constraints.iter().flat_map(|c| c.edges.iter()).collect::<BTreeSet<_>>();
-        println!(
-            "strong edges = {}, joined constraints = {}",
-            strong_edges.len(),
-            constraints.len(),
-        );
-    }
-
-    {
-        let mut stats = BTreeMap::new();
-        for c in &constraints {
-            let key = (c.triples.len(), c.edges.len());
-            stats
-                .entry(key)
-                .and_modify(|x| *x += 1usize)
-                .or_insert(1usize);
-        }
-        println!("{:?}", stats);
-    }
-
-    let mut clusters: Vec<Cluster> = vec![];
-
-    for nh_min_weight in [3, 2] {
+    let mut nodes = nodes;
+    for is_triple in [false, true] {
         loop {
-            println!();
-
-            let opts = TightOptions {
-                nh_min_weight,
-                cover_nodes: 14,
-                min_constraints: 25,
-            };
-
-            let tight_clusters = get_tight_clusters(&constraints, opts);
-
-            if tight_clusters.is_empty() {
+            let (used_nodes, res) = mk_pyramid(&nodes, 0, is_triple);
+            if res.is_empty() {
                 break;
             }
 
-            for tc in tight_clusters {
-                println!(
-                    "mw={} triples={} edges={} cover={}",
-                    nh_min_weight,
-                    tc.nodes.len(),
-                    tc.edges.len(),
-                    tc.cover.len(),
-                );
-
-                constraints.retain(|c| !tc.nodes.contains(c));
-                clusters.push(tc);
-            }
+            println!(
+                "{}: {:?}",
+                res.len(),
+                res.iter().map(|c| c.extension.len()).collect::<Vec<_>>()
+            );
+            nodes.retain(|n| !used_nodes.contains(n));
         }
 
-        let covered_edges = clusters.iter().flat_map(|c| c.edges.iter()).collect::<BTreeSet<_>>();
-        println!(
-            "clusters = {}, constraints in clusters = {}, covered_edges = {}, remaining constraints = {}",
-            clusters.len(),
-            clusters.iter().map(|c| c.nodes.len()).sum::<usize>(), // FIXME: don't count
-                                                                   // repititions
-            covered_edges.len(),
-            constraints.len(),
-        );
+        print_stats1(&nodes);
     }
 
-    clusters.sort_by_key(|c| cmp::Reverse(c.nodes.len()));
-
-    // save_all(&clusters, "clusters.json")?;
-    //solve_all(&clusters);
-
     Ok(())
+}
+
+fn print_stats1(nodes: &[Node]) {
+    let mut triples = 0;
+    let mut quads = 0;
+    for n in nodes {
+        match n {
+            Node::Triple(_) => triples += 1,
+            Node::Quad(_) => quads += 1,
+        }
+    }
+
+    println!("triples = {}, quads = {}", triples, quads);
+}
+
+fn print_weak_edges(nodes: &[Node]) {
+    let edges = mk_edge_weights(nodes);
+    let weak_edges = edges.values().filter(|ns| **ns < 3).count();
+    println!("weak edges = {}", weak_edges);
+}
+
+fn mk_pyramid(
+    nodes: &Vec<Node>,
+    min_ext_size: usize,
+    is_triple: bool,
+) -> (BTreeSet<Node>, Vec<ExtendedPyramid>) {
+    let mut candidates = vec![];
+
+    let edge_ix = mk_edge_index(nodes);
+    'level0: for n0 in nodes {
+        if n0.is_triple() != is_triple {
+            continue;
+        }
+
+        let l0 = vec![*n0];
+
+        if let Some(n0_children) = get_children(n0, &edge_ix, &[&l0]) {
+            let l1 = n0_children;
+            let mut l2 = vec![];
+
+            for n1 in &l1 {
+                let n1_children = get_children(n1, &edge_ix, &[&l0, &l1, &l2]);
+                if let Some(n1_children) = n1_children {
+                    for n2 in &n1_children {
+                        l2.push(*n2);
+                    }
+                } else {
+                    continue 'level0;
+                }
+            }
+
+            let mut used_nodes = BTreeSet::new();
+            for n in l0.iter().chain(&l1).chain(&l2) {
+                used_nodes.insert(*n);
+            }
+
+            // Get pyramid extension
+            let p = Pyramid::new(n0, &l1, &l2);
+            let extension: BTreeSet<Node> = nodes
+                .iter()
+                .filter(|n| !used_nodes.contains(n) && p.covers(n))
+                .cloned()
+                .collect();
+
+            candidates.push(ExtendedPyramid { base: p, extension });
+        }
+    }
+
+    candidates.sort_by_key(|p| cmp::Reverse(p.extension.len()));
+
+    // select multiple non-intersecting and with big extension
+    let mut used_nodes = BTreeSet::new();
+    let mut res = vec![];
+    for c in candidates {
+        let is_disjoint = used_nodes.is_disjoint(&c.extension)
+            && used_nodes.is_disjoint(&c.base.nodes);
+        if is_disjoint && c.extension.len() >= min_ext_size {
+            for n in &c.base.nodes {
+                used_nodes.insert(*n);
+            }
+            for n in &c.extension {
+                used_nodes.insert(*n);
+            }
+            res.push(c);
+        }
+    }
+
+    (used_nodes, res)
+}
+
+fn get_children(
+    node: &Node,
+    edge_ix: &EdgeIx<Node>,
+    used_nodes: &[&Vec<Node>],
+) -> Option<Vec<Node>> {
+    let mut children = vec![];
+
+    for e in node.edges() {
+        if let Some(child) = get_first_child(&e, edge_ix, used_nodes) {
+            children.push(child);
+        } else {
+            return None;
+        }
+    }
+
+    Some(children)
+}
+
+fn get_first_child(
+    edge: &Edge,
+    edge_ix: &EdgeIx<Node>,
+    used_nodes: &[&Vec<Node>],
+) -> Option<Node> {
+    edge_ix
+        .get(edge)
+        .unwrap()
+        .iter()
+        .filter(|x| {
+            x.is_triple()
+                && !used_nodes.iter().any(|u| u.iter().any(|y| *x == y))
+        })
+        .next()
+        .copied()
 }
 
 //fn save_all(clusters: &[Cluster], file_name: &str) -> anyhow::Result<()> {
@@ -117,87 +183,3 @@ fn main() -> anyhow::Result<()> {
 //    serde_json::to_writer(&mut writer, &clusters)?;
 //    Ok(writer.flush()?)
 //}
-
-//fn solve_all(clusters: &[Cluster]) {
-//    for c in clusters {
-//        print!(
-//            "triples={} edges={} cover={} ",
-//            c.nodes.len(),
-//            c.edges.len(),
-//            c.cover.len(),
-//        );
-//
-//        stdout().flush().unwrap();
-//
-//        let now = std::time::Instant::now();
-//        println!(
-//            "solutions={} elapsed={:.2?}",
-//            fast_brute_force(
-//                &c.cover,
-//                &c.nodes.difference(&c.cover).cloned().collect()
-//            )
-//            .separate_with_commas(),
-//            now.elapsed()
-//        );
-//    }
-//}
-//
-
-
-struct TightOptions {
-    nh_min_weight: usize,
-    cover_nodes: usize,
-    min_constraints: usize,
-}
-
-fn get_tight_clusters(
-    constraints: &[Constraint],
-    opts: TightOptions,
-) -> Vec<Cluster> {
-    let nh_opts = NeighborhoodOptions {
-        width: 3,
-        min_weight: opts.nh_min_weight,
-    };
-
-    let mut nhs = vec![];
-    for c in tight_neighborhoods(constraints, &nh_opts) {
-        // Shrink cover and drop uncovered triples.
-        // FIXME: Try to order nodes by weight before shrinking.
-        let nodes = c.nodes.iter().cloned().collect::<Vec<_>>();
-        let cover = exact_cover(opts.cover_nodes, &nodes);
-        let cover: BTreeSet<Constraint> =
-            cover.iter().take(opts.cover_nodes).cloned().collect();
-        let covered_edges: BTreeSet<Edge> = cover
-            .iter()
-            .flat_map(|c| c.edges().collect::<Vec<_>>())
-            .collect();
-        let nodes: BTreeSet<Constraint> = c
-            .nodes
-            .iter()
-            .filter(|t| t.edges().all(|e| covered_edges.contains(&e)))
-            .cloned()
-            .collect();
-
-        // FIXME: store cover somewhere
-        if opts.min_constraints <= c.nodes.len() && c.edges.len() == covered_edges.len() {
-            nhs.push(Cluster::new(&nodes));
-        }
-    }
-
-    // Prefer more nodes but smaller cover.
-    nhs.sort_by_key(|c: &Cluster| (cmp::Reverse(c.nodes.len()), c.cover.len()));
-
-    // Select disjoint clusters (i.e. not having common constraints).
-    // FIXME: selecting clusters with disjoint EDGES allegedly allows to cover more edges.
-    let mut used_constraints = BTreeSet::new();
-    let mut res = vec![];
-    for c in nhs {
-        if c.nodes.intersection(&used_constraints).count() < 10 {
-            for n in &c.nodes {
-                used_constraints.insert(n.clone());
-            }
-            res.push(c);
-        }
-    }
-    res
-}

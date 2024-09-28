@@ -1,61 +1,43 @@
 use super::edge_index::mk_edge_index;
-use crate::types::Constraint;
+use crate::types::{HasIterableEdges, Node};
 use std::collections::BTreeSet;
 
 // Weak edge is an edge that connects too few nodes.
-pub fn join_weak_edges(cs: &[Constraint], weight: usize) -> Vec<Constraint> {
+pub fn join_weak_edges(nodes: &[Node], weight: usize) -> Vec<Node> {
     let mut res = vec![];
-    let mut used_cs_set: BTreeSet<Constraint> = BTreeSet::new();
-    for (e, ts) in mk_edge_index(cs) {
-        if ts.len() == weight {
-            if ts.iter().all(|t| t.triples.len() == 1 && !used_cs_set.contains(t)) {
-                let triples = ts.iter().flat_map(|t| t.triples.iter()).cloned().collect::<Vec<_>>();
-                res.push(Constraint::with_captives(&triples, [e].into()));
-                ts.into_iter().for_each(|t| {
-                    used_cs_set.insert(t);
-                });
+    let mut joined_nodes: BTreeSet<Node> = BTreeSet::new();
+
+    for (e, ns) in mk_edge_index(nodes) {
+        if ns.len() == weight {
+            if ns
+                .iter()
+                .all(|n| n.is_triple() && !joined_nodes.contains(n))
+            {
+                // Add bunch of quads instead of joined triples.
+                // One quad for weight=2, three quads for weight=3.
+                for i in 0..ns.len() - 1 {
+                    let a: Vec<_> = ns[i].edges().filter(|x| *x != e).collect();
+                    for j in i + 1..ns.len() {
+                        let b: Vec<_> =
+                            ns[j].edges().filter(|x| *x != e).collect();
+
+                        res.push(Node::Quad([a[0], a[1], b[0], b[1]]));
+                    }
+                }
+
+                for n in ns {
+                    joined_nodes.insert(n);
+                }
             }
         }
     }
 
-    for c in cs {
-        if !used_cs_set.contains(c) {
-            res.push(c.clone());
+    for n in nodes {
+        if !joined_nodes.contains(n) {
+            res.push(*n);
         }
     }
 
-    res
-}
-
-pub fn join_chains(cs: &[Constraint]) -> Vec<Constraint> {
-    let mut res = vec![];
-    let mut used_cs_set: BTreeSet<Constraint> = BTreeSet::new();
-    for (e, ts) in mk_edge_index(cs) {
-        if ts.len() == 2 {
-            let a = &ts[0];
-            let b = &ts[1];
-            let can_join = a.triples.len() + b.triples.len() <= 3
-                && !used_cs_set.contains(a)
-                && !used_cs_set.contains(b);
-            if can_join {
-                let triples = ts.iter().flat_map(|t| t.triples.iter()).cloned().collect::<Vec<_>>();
-                let mut captives = ts.iter().flat_map(|c| c.captives.iter()).cloned().collect::<BTreeSet<_>>();
-                captives.insert(e);
-
-                res.push(Constraint::with_captives(&triples, captives));
-
-                ts.into_iter().for_each(|t| {
-                    used_cs_set.insert(t);
-                });
-            }
-        }
-    }
-
-    for c in cs {
-        if !used_cs_set.contains(c) {
-            res.push(c.clone());
-        }
-    }
-
+    res.sort();
     res
 }
