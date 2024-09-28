@@ -33,23 +33,78 @@ fn main() -> anyhow::Result<()> {
     print_stats1(&nodes);
 
     let mut nodes = nodes;
-    for is_triple in [false, true] {
-        loop {
-            let (used_nodes, res) = mk_pyramid(&nodes, 0, is_triple);
-            if res.is_empty() {
-                break;
+    let mut clusters = vec![];
+    loop {
+        let edge_ix = mk_edge_index(&nodes);
+        let all_claws: Vec<Claw> = nodes
+            .iter()
+            .filter(|n| n.is_triple())
+            .flat_map(|n| mk_claw(n, &edge_ix))
+            .collect();
+
+        println!("all_claws = {}", all_claws.len());
+
+        let mut new_clusters = 0;
+        let mut used_nodes = BTreeSet::new();
+
+        'cluster: for c0 in &all_claws {
+            let mut cluster = ClawCluster::new(c0.clone());
+
+            for _ in 0..4 {
+                let mut best_next_claw: Option<Claw> = None;
+                let mut best_extension = BTreeSet::new();
+
+                for c1 in &all_claws {
+                    if !cluster.edges.is_disjoint(&c1.edges) {
+                        continue;
+                    }
+
+                    // Nodes covered by selected claws.
+                    let extension: BTreeSet<Node> = c1.edges
+                        .iter()
+                        .flat_map(|e| edge_ix.get(e).unwrap())
+                        .filter(|n| {
+                            n.edges().all(|e| cluster.edges.contains(&e) || c1.edges.contains(&e))
+                                && !cluster.nodes.contains(n)
+                                && !c1.nodes.contains(n)
+                        })
+                        .cloned()
+                        .collect();
+
+                    // Choose best next claw.
+                    if extension.len() > best_extension.len() {
+                        best_next_claw = Some(c1.clone());
+                        best_extension = extension;
+                    }
+                }
+
+                if let Some(next_claw) = best_next_claw {
+                    cluster.append(next_claw, best_extension);
+                } else {
+                    continue 'cluster;
+                }
             }
 
-            println!(
-                "{}: {:?}",
-                res.len(),
-                res.iter().map(|c| c.extension.len()).collect::<Vec<_>>()
-            );
-            nodes.retain(|n| !used_nodes.contains(n));
+            // FIXME: check base size
+            if cluster.extension.len() >= 14 {
+                println!("{} {}", cluster.base.len(), cluster.extension.len());
+                for n in &cluster.nodes {
+                    used_nodes.insert(n.clone());
+                }
+                clusters.push(cluster);
+                new_clusters += 1;
+            }
         }
 
-        print_stats1(&nodes);
+        if new_clusters == 0 {
+            break;
+        }
+
+        println!();
+        nodes.retain(|n| !used_nodes.contains(n));
     }
+
+    print_stats1(&nodes);
 
     Ok(())
 }
@@ -73,108 +128,24 @@ fn print_weak_edges(nodes: &[Node]) {
     println!("weak edges = {}", weak_edges);
 }
 
-fn mk_pyramid(
-    nodes: &Vec<Node>,
-    min_ext_size: usize,
-    is_triple: bool,
-) -> (BTreeSet<Node>, Vec<ExtendedPyramid>) {
-    let mut candidates = vec![];
-
-    let edge_ix = mk_edge_index(nodes);
-    'level0: for n0 in nodes {
-        if n0.is_triple() != is_triple {
-            continue;
-        }
-
-        let l0 = vec![*n0];
-
-        if let Some(n0_children) = get_children(n0, &edge_ix, &[&l0]) {
-            let l1 = n0_children;
-            let mut l2 = vec![];
-
-            for n1 in &l1 {
-                let n1_children = get_children(n1, &edge_ix, &[&l0, &l1, &l2]);
-                if let Some(n1_children) = n1_children {
-                    for n2 in &n1_children {
-                        l2.push(*n2);
-                    }
-                } else {
-                    continue 'level0;
-                }
-            }
-
-            let mut used_nodes = BTreeSet::new();
-            for n in l0.iter().chain(&l1).chain(&l2) {
-                used_nodes.insert(*n);
-            }
-
-            // Get pyramid extension
-            let p = Pyramid::new(n0, &l1, &l2);
-            let extension: BTreeSet<Node> = nodes
-                .iter()
-                .filter(|n| !used_nodes.contains(n) && p.covers(n))
-                .cloned()
-                .collect();
-
-            candidates.push(ExtendedPyramid { base: p, extension });
-        }
-    }
-
-    candidates.sort_by_key(|p| cmp::Reverse(p.extension.len()));
-
-    // select multiple non-intersecting and with big extension
-    let mut used_nodes = BTreeSet::new();
-    let mut res = vec![];
-    for c in candidates {
-        let is_disjoint = used_nodes.is_disjoint(&c.extension)
-            && used_nodes.is_disjoint(&c.base.nodes);
-        if is_disjoint && c.extension.len() >= min_ext_size {
-            for n in &c.base.nodes {
-                used_nodes.insert(*n);
-            }
-            for n in &c.extension {
-                used_nodes.insert(*n);
-            }
-            res.push(c);
-        }
-    }
-
-    (used_nodes, res)
-}
-
-fn get_children(
-    node: &Node,
-    edge_ix: &EdgeIx<Node>,
-    used_nodes: &[&Vec<Node>],
-) -> Option<Vec<Node>> {
+fn mk_claw(node: &Node, edge_ix: &EdgeIx<Node>) -> Option<Claw> {
     let mut children = vec![];
 
     for e in node.edges() {
-        if let Some(child) = get_first_child(&e, edge_ix, used_nodes) {
-            children.push(child);
+        let child = edge_ix
+            .get(&e)
+            .unwrap()
+            .iter()
+            .filter(|n| n.is_triple() && *n != node)
+            .next();
+        if let Some(child) = child {
+            children.push(*child);
         } else {
             return None;
         }
     }
 
-    Some(children)
-}
-
-fn get_first_child(
-    edge: &Edge,
-    edge_ix: &EdgeIx<Node>,
-    used_nodes: &[&Vec<Node>],
-) -> Option<Node> {
-    edge_ix
-        .get(edge)
-        .unwrap()
-        .iter()
-        .filter(|x| {
-            x.is_triple()
-                && !used_nodes.iter().any(|u| u.iter().any(|y| *x == y))
-        })
-        .next()
-        .copied()
+    Some(Claw::new(node, &children))
 }
 
 //fn save_all(clusters: &[Cluster], file_name: &str) -> anyhow::Result<()> {

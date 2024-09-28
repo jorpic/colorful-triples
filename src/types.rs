@@ -39,39 +39,49 @@ impl HasIterableEdges for Node {
 }
 
 #[derive(Clone, Debug)]
-pub struct Pyramid {
-    pub edges: Vec<Edge>,
+pub struct Claw {
     pub nodes: BTreeSet<Node>,
-    edge_set: BTreeSet<Edge>,
+    pub edges: BTreeSet<Edge>,
 }
 
-impl Pyramid {
-    pub fn new(n0: &Node, l1: &[Node], l2: &[Node]) -> Self {
-        let edge_set = BTreeSet::from_iter(
-            n0.edges()
-                .chain(l1.iter().flat_map(|n| n.edges()))
-                .chain(l2.iter().flat_map(|n| n.edges())),
-        );
+impl Claw {
+    pub fn new(n0: &Node, l1: &[Node]) -> Self {
+        let nodes = [*n0].iter().chain(l1).cloned().collect::<BTreeSet<_>>();
+        let edges = nodes.iter().flat_map(|n| n.edges()).collect();
 
-        let nodes = [*n0].iter().chain(l1).chain(l2).cloned().collect();
-
-        // FIXME: reorder edges canonically
-        let mut edges = vec![];
-
-        Self {
-            edges,
-            nodes,
-            edge_set,
-        }
-    }
-
-    pub fn covers(&self, n: &Node) -> bool {
-        n.edges().all(|e| self.edge_set.contains(&e))
+        Self { nodes, edges }
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct ExtendedPyramid {
-    pub base: Pyramid,
+#[derive(Clone, Debug, Default)]
+pub struct ClawCluster {
+    pub base: Vec<Claw>,
     pub extension: BTreeSet<Node>,
+    pub edges: BTreeSet<Edge>,
+    pub nodes: BTreeSet<Node>,
+}
+
+impl ClawCluster {
+    pub fn new(c0: Claw) -> Self {
+        let mut cluster = Self::default();
+        cluster.append(c0, BTreeSet::new());
+        cluster
+    }
+
+    pub fn append(&mut self, c: Claw, mut ext: BTreeSet<Node>) {
+        self.base.push(c);
+        self.extension.append(&mut ext);
+
+        self.edges = self.base
+            .iter()
+            .flat_map(|c| &c.edges)
+            .cloned()
+            .collect();
+        self.nodes = self.base
+            .iter()
+            .flat_map(|c| &c.nodes)
+            .chain(&self.extension)
+            .cloned()
+            .collect();
+    }
 }
