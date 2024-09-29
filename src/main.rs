@@ -31,81 +31,84 @@ fn main() -> anyhow::Result<()> {
     print_stats1(&nodes);
 
     let mut nodes = nodes;
-    let mut clusters = vec![];
-    loop {
-        let edge_ix = mk_edge_index(&nodes);
-        let all_claws: Vec<Claw> = nodes
-            .iter()
-            .filter(|n| n.is_triple())
-            .flat_map(|n| mk_claw(n, &edge_ix))
-            .collect();
-
-        println!("all_claws = {}", all_claws.len());
-
-        let mut new_clusters = 0;
-        let mut used_nodes: BTreeSet<Node> = BTreeSet::new();
-
-        'cluster: for c0 in &all_claws {
-            let mut cluster = ClawCluster::new(c0.clone());
-
-            for _ in 0..4 {
-                let mut best_next_claw: Option<Claw> = None;
-                let mut best_extension = BTreeSet::new();
-
-                for c1 in &all_claws {
-                    if !cluster.edges.is_disjoint(&c1.edges) {
-                        continue;
-                    }
-
-                    // Nodes covered by selected claws.
-                    let extension: BTreeSet<Node> = c1.edges
-                        .iter()
-                        .flat_map(|e| edge_ix.get(e).unwrap())
-                        .filter(|n| {
-                            n.edges().all(|e| cluster.edges.contains(&e) || c1.edges.contains(&e))
-                                && !used_nodes.contains(n)
-                                && !cluster.nodes.contains(n)
-                                && !c1.nodes.contains(n)
-                        })
-                        .cloned()
-                        .collect();
-
-                    // Choose best next claw.
-                    if extension.len() > best_extension.len() {
-                        best_next_claw = Some(c1.clone());
-                        best_extension = extension;
-                    }
-                }
-
-                if let Some(next_claw) = best_next_claw {
-                    cluster.append(next_claw, best_extension);
-                } else {
-                    continue 'cluster;
-                }
-            }
-
-            // FIXME: check base size
-            if cluster.extension.len() >= 14 {
-                println!("{} {}", cluster.base.len(), cluster.extension.len());
-                for n in &cluster.nodes {
-                    used_nodes.insert(n.clone());
-                }
-                clusters.push(cluster);
-                new_clusters += 1;
-            }
+    for num_claws in [5, 4]{
+        for min_ext_len in (num_claws+1..num_claws*3-1).rev() {
+            get_clusters(&mut nodes, num_claws, min_ext_len);
+            print_stats1(&nodes);
         }
-
-        if new_clusters == 0 {
-            break;
-        }
-
-        println!();
-        nodes.retain(|n| !used_nodes.contains(n));
-        print_stats1(&nodes);
     }
 
     Ok(())
 }
+
+fn get_clusters(nodes: &mut Vec<Node>, num_claws: usize, min_ext_len: usize) -> Vec<ClawCluster> {
+
+    let edge_ix = mk_edge_index(&nodes.clone());
+    let all_claws: Vec<Claw> = nodes
+        .iter()
+        .filter(|n| n.is_triple())
+        .flat_map(|n| mk_claw(n, &edge_ix))
+        .collect();
+
+    println!("all_claws = {}", all_claws.len());
+
+    let mut clusters = vec![];
+    let mut new_clusters = 0;
+    let mut used_nodes: BTreeSet<Node> = BTreeSet::new();
+
+    'cluster: for c0 in &all_claws {
+        let mut cluster = ClawCluster::new(c0.clone());
+
+        for _ in 0..num_claws-1 {
+            let mut best_next_claw: Option<Claw> = None;
+            let mut best_extension = BTreeSet::new();
+
+            for c1 in &all_claws {
+                if !cluster.edges.is_disjoint(&c1.edges) {
+                    continue;
+                }
+
+                // Nodes covered by selected claws.
+                let extension: BTreeSet<Node> = c1.edges
+                    .iter()
+                    .flat_map(|e| edge_ix.get(e).unwrap())
+                    .filter(|n| {
+                        n.edges().all(|e| cluster.edges.contains(&e) || c1.edges.contains(&e))
+                            && !used_nodes.contains(n)
+                            && !cluster.nodes.contains(n)
+                            && !c1.nodes.contains(n)
+                    })
+                    .cloned()
+                    .collect();
+
+                // Choose best next claw.
+                if extension.len() > best_extension.len() {
+                    best_next_claw = Some(c1.clone());
+                    best_extension = extension;
+                }
+            }
+
+            if let Some(next_claw) = best_next_claw {
+                cluster.append(next_claw, best_extension);
+            } else {
+                continue 'cluster;
+            }
+        }
+
+        if cluster.extension.len() >= min_ext_len {
+            println!("{} {}", cluster.base.len(), cluster.extension.len());
+            for n in &cluster.nodes {
+                used_nodes.insert(n.clone());
+            }
+            clusters.push(cluster);
+            new_clusters += 1;
+        }
+    }
+
+    nodes.retain(|n| !used_nodes.contains(n));
+    clusters
+}
+
 
 fn print_stats1(nodes: &[Node]) {
     let mut triples = 0;
