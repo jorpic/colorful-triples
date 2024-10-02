@@ -24,19 +24,29 @@ fn main() -> anyhow::Result<()> {
     println!("without pendants = {}", triples.len());
 
     let nodes: Vec<_> = triples.into_iter().map(Node::Triple).collect();
-    let nodes = join_weak_edges(&nodes, 3);
-    let nodes = join_weak_edges(&nodes, 2);
+    //let nodes = join_weak_edges(&nodes, 3);
+    //let nodes = join_weak_edges(&nodes, 2);
 
     print_weak_edges(&nodes);
     print_stats1(&nodes);
 
     let mut nodes = nodes;
-    for num_claws in [5, 4]{
-        for min_ext_len in (num_claws+1..num_claws*3-1).rev() {
-            get_clusters(&mut nodes, num_claws, min_ext_len);
-            print_stats1(&nodes);
+    let mut claws = vec![];
+    loop {
+        if nodes.is_empty() {
+            break;
+        }
+        let edge_ix = mk_edge_index(&nodes.clone());
+        let claw = nodes.iter().flat_map(|n| mk_claw(n, &edge_ix)).next();
+        if let Some(claw) = claw {
+            nodes.retain(|n| !claw.nodes.contains(n));
+            claws.push(claw);
+        } else {
+            break;
         }
     }
+
+    println!("claws = {}, remaining nodes = {}", claws.len(), nodes.len());
 
     Ok(())
 }
