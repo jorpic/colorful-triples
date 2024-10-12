@@ -187,18 +187,10 @@ const cluster_nodes = clusters.map((c, ix) => ({
     ix,
     color: "red",
     labels: new Set(c.nodes.flat()),
+    nodes: c.nodes
 }));
 
-const extension_nodes = clusters.map((c, ix) => ({
-    ix: ix + "_0",
-    color: "green",
-    labels: new Set([...c.extensions[0]].flat()),
-})).concat(
-    clusters.map((c, ix) => ({
-        ix: ix + "_1",
-        color: "blue",
-        labels: new Set([...c.extensions[1]].flat()),
-})));
+const extension_nodes = [];
 
 const joined_nodes = cluster_nodes.concat(extension_nodes);
 const joined_edges = [];
@@ -209,7 +201,7 @@ for(let i = 0; i < joined_nodes.length-1; i++) {
         const target = joined_nodes[j];
         const common_labels = source.labels
             .intersection(target.labels);
-        if (common_labels.size >= 6) {
+        if (common_labels.size >= 8) {
             joined_edges.push({
                 source, target,
                 weight: common_labels.size,
@@ -257,8 +249,8 @@ function joinedSVG(graph) {
       .attr("fill", n => n.ix < 5 ? "orange" : n.color)
       .attr("cx", n => n.x)
       .attr("cy", n => n.y)
-      .attr("r", n => n.ix < 5 ? 10 : 5)
-      .append("title").text(n => `ix:${n.ix}`);
+      .attr("r", n => n.nodes.length/2)
+      .append("title").text(n => `ns:${n.nodes.length}`);
 
   return svg.node();
 }

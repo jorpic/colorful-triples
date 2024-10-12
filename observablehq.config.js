@@ -8,6 +8,7 @@ export default {
         {name: "Pendants", path: "/pendants"},
         {name: "Neighborhoods", path: "/neighborhoods"},
         {name: "Cluster Extensions", path: "/cluster-ext"},
+        {name: "Cluster Base", path: "/cluster-base"},
       ]
     }
   ],

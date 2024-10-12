@@ -79,7 +79,7 @@ export function applyLayout(graph) {
         .distance(10))
     .force(
       "charge",
-      d3.forceManyBody().strength(-100)
+      d3.forceManyBody().strength(-300)
     )
     .force("x", d3.forceX(0))
     .force("y", d3.forceY(0))
