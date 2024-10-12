@@ -36,7 +36,7 @@ fn main() -> anyhow::Result<()> {
         if nodes.is_empty() {
             break;
         }
-        let edge_ix = mk_edge_index(&nodes.clone());
+        let edge_ix = mk_edge_index(&nodes);
         let claw = nodes.iter().flat_map(|n| mk_claw(n, &edge_ix)).next();
         if let Some(claw) = claw {
             nodes.retain(|n| !claw.nodes.contains(n));
@@ -47,6 +47,20 @@ fn main() -> anyhow::Result<()> {
     }
 
     println!("claws = {}, remaining nodes = {}", claws.len(), nodes.len());
+
+    // TODO: can we cover remaining nodes with claw clusters?
+    let claw_ix = mk_edge_index(&claws);
+    for n in nodes {
+        let mut claw_cover: Vec<_> = n
+            .edges()
+            .flat_map(|e| claw_ix.get(&e))
+            .flat_map(|cs|
+                cs
+                    .iter()
+                    .filter(|c| true) // not used in prev covers
+                    .next())
+            .collect();
+    }
 
     Ok(())
 }

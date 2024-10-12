@@ -53,6 +53,13 @@ impl Claw {
     }
 }
 
+impl HasIterableEdges for Claw {
+    fn edges(&self) -> impl Iterator<Item = Edge> {
+        self.edges.iter().cloned()
+    }
+}
+
+
 #[derive(Clone, Debug, Default)]
 pub struct ClawCluster {
     pub base: Vec<Claw>,
