@@ -39,6 +39,27 @@ impl HasIterableEdges for Node {
 }
 
 #[derive(Clone, Debug)]
+pub struct Knot {
+    pub triples: BTreeSet<Triple>,
+    pub edges: BTreeSet<Edge>,
+}
+
+impl Knot {
+    pub fn new(ts: &[Triple]) -> Self {
+        let triples = ts.iter().cloned().collect::<BTreeSet<_>>();
+        let edges = triples.iter().flat_map(|t| t.edges()).collect();
+
+        Self { triples, edges }
+    }
+}
+
+impl HasIterableEdges for Knot {
+    fn edges(&self) -> impl Iterator<Item = Edge> {
+        self.edges.iter().cloned()
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct Claw {
     pub nodes: BTreeSet<Node>,
     pub edges: BTreeSet<Edge>,

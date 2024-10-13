@@ -23,6 +23,8 @@ fn main() -> anyhow::Result<()> {
     let triples = drop_weak_nodes(triples, 2);
     println!("without pendants = {}", triples.len());
 
+    get_knots(&triples);
+
     let nodes: Vec<_> = triples.into_iter().map(Node::Triple).collect();
     //let nodes = join_weak_edges(&nodes, 3);
     //let nodes = join_weak_edges(&nodes, 2);
@@ -63,6 +65,70 @@ fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+fn get_knots(triples: &[Triple]) -> Vec<Knot> {
+    let triple_set: BTreeSet<_> = triples.iter().cloned().collect();
+    let edge_ix = mk_edge_index(triples);
+
+    // Skip weak triples
+    // let mut used_triples: BTreeSet<Triple> = edge_ix.values().filter(|v| v.len() == 2).flatten().cloned().collect();
+    let mut used_triples: BTreeSet<Triple> = BTreeSet::new();
+
+    let weak_triples_len = used_triples.len();
+    let mut knots = vec![];
+
+    // 't0: for t0 in triples.iter().rev() {
+    't0: for t0 in triples {
+        if used_triples.contains(t0) {
+            continue;
+        }
+        let [a, b, c] = t0;
+
+        for t1 in edge_ix.get(a).unwrap() {
+            if used_triples.contains(t1) || t1 <= t0 || t1[0] != *a {
+                continue;
+            }
+
+            let [_, d, e] = t1;
+
+            for t2 in edge_ix.get(b).unwrap() {
+                if used_triples.contains(t2) || t2[0] != *b {
+                    continue;
+                }
+
+                let [_, f, g] = t2;
+
+                for t3 in edge_ix.get(c).unwrap() {
+                    if used_triples.contains(t3) || t3[0] != *c {
+                        continue;
+                    }
+
+                    let [_, h, x] = t3;
+                    let t4 = [*d, *f, *h];
+                    let t5 = [*e, *g, *x];
+
+                    let exists = triple_set.contains(&t4) && triple_set.contains(&t5);
+                    // Allow some triple reuse
+                    let used = false; // used_triples.contains(&t4) || used_triples.contains(&t5);
+                    if exists && !used {
+                        let knot = Knot::new(&[*t0, *t1, *t2, *t3, t4, t5]);
+                        for t in &knot.triples {
+                            used_triples.insert(*t);
+                        }
+                        knots.push(knot);
+                        continue 't0;
+                    }
+                }
+            }
+        }
+    }
+    println!("knots {}", knots.len());
+    println!("used triples {}", used_triples.len() - weak_triples_len);
+    println!("weak triples {}", weak_triples_len);
+    println!("remaining triples {}", triples.len() - used_triples.len());
+
+    knots
 }
 
 fn get_clusters(nodes: &mut Vec<Node>, num_claws: usize, min_ext_len: usize) -> Vec<ClawCluster> {
