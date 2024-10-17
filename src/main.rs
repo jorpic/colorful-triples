@@ -1,6 +1,6 @@
 // #![feature(portable_simd)]
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, BTreeMap};
 //use std::fs::File;
 //use std::io::{stdout, BufWriter, Write};
 
@@ -23,84 +23,154 @@ fn main() -> anyhow::Result<()> {
     let triples = drop_weak_nodes(triples, 2);
     println!("without pendants = {}", triples.len());
 
-    get_knots(&triples);
+    let triple_set: BTreeSet<_> = triples.iter().collect();
 
-    let nodes: Vec<_> = triples.into_iter().map(Node::Triple).collect();
-    //let nodes = join_weak_edges(&nodes, 3);
-    //let nodes = join_weak_edges(&nodes, 2);
+    let mut xy_ix = BTreeMap::new();
+    for t in &triples {
+        xy_ix.insert((t[0], t[1]), t[2]);
+    }
 
-    print_weak_edges(&nodes);
-    print_stats1(&nodes);
+    // ---------------------
 
-    let mut nodes = nodes;
-    let mut claws = vec![];
-    loop {
-        if nodes.is_empty() {
-            break;
-        }
-        let edge_ix = mk_edge_index(&nodes);
-        let claw = nodes.iter().flat_map(|n| mk_claw(n, &edge_ix)).next();
-        if let Some(claw) = claw {
-            nodes.retain(|n| !claw.nodes.contains(n));
-            claws.push(claw);
-        } else {
-            break;
+    let k4s = get_4knots(&triples);
+    println!("got {} 4-knots", k4s.len());
+
+    for i in 0..k4s.len() {
+        for j in i+1..k4s.len() {
+            for k in j+1..k4s.len() {
+                let x = [k4s[i][0][0], k4s[j][0][0], k4s[k][0][0]];
+                let z = [k4s[i][3][2], k4s[j][3][2], k4s[k][3][2]];
+
+                if triple_set.contains(&x) && triple_set.contains(&z) {
+                    println!("{:?} {:?} {:?}", (i,j,k), x, z);
+                }
+            }
         }
     }
 
-    println!("claws = {}, remaining nodes = {}", claws.len(), nodes.len());
 
-    // TODO: can we cover remaining nodes with claw clusters?
-    let claw_ix = mk_edge_index(&claws);
-    for n in nodes {
-        let mut claw_cover: Vec<_> = n
-            .edges()
-            .flat_map(|e| claw_ix.get(&e))
-            .flat_map(|cs|
-                cs
-                    .iter()
-                    .filter(|c| true) // not used in prev covers
-                    .next())
-            .collect();
+    // ---------------------
+
+    let k6s = get_6knots(&triples);
+    println!("got {} 6-knots", k6s.len());
+
+    let used_triples: BTreeSet<_> = k6s.iter().flatten().collect();
+    println!("{} triples used", used_triples.len());
+
+
+    let mut k6t0_ix: BTreeMap<Triple, Vec<usize>> = BTreeMap::new();
+    for i in 0..k6s.len() {
+        k6t0_ix.entry(k6s[i][0])
+            .and_modify(|x| x.push(i))
+            .or_insert(vec![i]);
+    }
+
+    for (t0, v) in k6t0_ix {
+        // println!("{:?} {:?}", t0, v);
+        for i in 0..v.len() {
+            for j in i+1..v.len() {
+                let [_, a1, a2, a3, _, _] = k6s[v[i]];
+                let [_, b1, b2, b3, _, _] = k6s[v[j]];
+
+                let Some(x) = xy_ix.get(&(a1[1], b1[2])) else { continue; };
+                let Some(xx) = xy_ix.get(&(a1[2], b1[1])) else { continue; };
+                if x != xx {
+                    continue;
+                }
+
+                let Some(y) = xy_ix.get(&(a2[1], b2[2])) else { continue; };
+                let Some(yy) = xy_ix.get(&(a2[2], b2[1])) else { continue; };
+                if y != yy {
+                    continue;
+                }
+
+                let Some(z) = xy_ix.get(&(a3[1], b3[2])) else { continue; };
+                let Some(zz) = xy_ix.get(&(a3[2], b3[1])) else { continue; };
+                if z != zz {
+                    continue;
+                }
+
+                if triple_set.contains(&[*x, *y, *z]) {
+                    println!("{:?} -> {:?}", t0, [x, y, z]);
+                }
+
+                //[a1[1], b1[2], x]
+                //[a1[2], b1[1], x]
+                //[a2[1], b2[2], y]
+                //[a2[2], b2[1], y]
+                //[a3[1], b3[2], z]
+                //[a3[2], b3[1], z]
+                //[x, y, z]
+            }
+        }
     }
 
     Ok(())
 }
 
-fn get_knots(triples: &[Triple]) -> Vec<Knot> {
-    let triple_set: BTreeSet<_> = triples.iter().cloned().collect();
+type Knot4 = [Triple; 4];
+type Knot6 = [Triple; 6];
+type Knot18 = [Triple; 18];
+
+
+fn get_4knots(triples: &[Triple]) -> Vec<Knot4> {
+    let triple_set: BTreeSet<_> = triples.iter().collect();
+
+    let mut edge_ix: BTreeMap<Edge, Vec<Triple>> = BTreeMap::new();
+    for t in triples {
+        edge_ix.entry(t[0])
+            .and_modify(|x| x.push(*t))
+            .or_insert(vec![*t]);
+    }
+
+    let mut xy_ix = BTreeMap::new();
+    for t in triples {
+        xy_ix.insert((t[0], t[1]), t[2]);
+    }
+
+    let mut knots = vec![];
+    for (x, v) in edge_ix {
+        for i in 0..v.len() {
+            let [_, a, b] = v[i];
+            for j in i+1..v.len() {
+                let [_, c, d] = v[j];
+                let Some(y) = xy_ix.get(&(a, d)) else { continue; };
+                let Some(z) = xy_ix.get(&(b, c)) else { continue; };
+                if y == z {
+                    println!("{:?}", [[x, a, b], [x, c, d], [a, d, *y], [b, c,*y]]);
+                    knots.push([[x, a, b], [x, c, d], [a, d, *y], [b, c, *y]]);
+                }
+            }
+        }
+    }
+
+    knots
+}
+
+fn get_6knots(triples: &[Triple]) -> Vec<Knot6> {
+    let triple_set: BTreeSet<_> = triples.iter().collect();
     let edge_ix = mk_edge_index(triples);
-
-    // Skip weak triples
-    // let mut used_triples: BTreeSet<Triple> = edge_ix.values().filter(|v| v.len() == 2).flatten().cloned().collect();
-    let mut used_triples: BTreeSet<Triple> = BTreeSet::new();
-
-    let weak_triples_len = used_triples.len();
     let mut knots = vec![];
 
-    // 't0: for t0 in triples.iter().rev() {
-    't0: for t0 in triples {
-        if used_triples.contains(t0) {
-            continue;
-        }
+    for t0 in triples {
         let [a, b, c] = t0;
 
         for t1 in edge_ix.get(a).unwrap() {
-            if used_triples.contains(t1) || t1 <= t0 || t1[0] != *a {
+            if t1 <= t0 || t1[0] != *a {
                 continue;
             }
 
             let [_, d, e] = t1;
 
             for t2 in edge_ix.get(b).unwrap() {
-                if used_triples.contains(t2) || t2[0] != *b {
+                if t2[0] != *b {
                     continue;
                 }
 
                 let [_, f, g] = t2;
 
                 for t3 in edge_ix.get(c).unwrap() {
-                    if used_triples.contains(t3) || t3[0] != *c {
+                    if t3[0] != *c {
                         continue;
                     }
 
@@ -108,140 +178,15 @@ fn get_knots(triples: &[Triple]) -> Vec<Knot> {
                     let t4 = [*d, *f, *h];
                     let t5 = [*e, *g, *x];
 
-                    let exists = triple_set.contains(&t4) && triple_set.contains(&t5);
-                    // Allow some triple reuse
-                    let used = false; // used_triples.contains(&t4) || used_triples.contains(&t5);
-                    if exists && !used {
-                        let knot = Knot::new(&[*t0, *t1, *t2, *t3, t4, t5]);
-                        for t in &knot.triples {
-                            used_triples.insert(*t);
-                        }
-                        knots.push(knot);
-                        continue 't0;
+                    let exists = triple_set.contains(&t4)
+                        && triple_set.contains(&t5);
+                    if exists {
+                        knots.push([*t0, *t1, *t2, *t3, t4, t5]);
                     }
                 }
             }
         }
     }
-    println!("knots {}", knots.len());
-    println!("used triples {}", used_triples.len() - weak_triples_len);
-    println!("weak triples {}", weak_triples_len);
-    println!("remaining triples {}", triples.len() - used_triples.len());
 
     knots
 }
-
-fn get_clusters(nodes: &mut Vec<Node>, num_claws: usize, min_ext_len: usize) -> Vec<ClawCluster> {
-
-    let edge_ix = mk_edge_index(&nodes.clone());
-    let all_claws: Vec<Claw> = nodes
-        .iter()
-        .filter(|n| n.is_triple())
-        .flat_map(|n| mk_claw(n, &edge_ix))
-        .collect();
-
-    println!("all_claws = {}", all_claws.len());
-
-    let mut clusters = vec![];
-    let mut new_clusters = 0;
-    let mut used_nodes: BTreeSet<Node> = BTreeSet::new();
-
-    'cluster: for c0 in &all_claws {
-        let mut cluster = ClawCluster::new(c0.clone());
-
-        for _ in 0..num_claws-1 {
-            let mut best_next_claw: Option<Claw> = None;
-            let mut best_extension = BTreeSet::new();
-
-            for c1 in &all_claws {
-                if !cluster.edges.is_disjoint(&c1.edges) {
-                    continue;
-                }
-
-                // Nodes covered by selected claws.
-                let extension: BTreeSet<Node> = c1.edges
-                    .iter()
-                    .flat_map(|e| edge_ix.get(e).unwrap())
-                    .filter(|n| {
-                        n.edges().all(|e| cluster.edges.contains(&e) || c1.edges.contains(&e))
-                            && !used_nodes.contains(n)
-                            && !cluster.nodes.contains(n)
-                            && !c1.nodes.contains(n)
-                    })
-                    .cloned()
-                    .collect();
-
-                // Choose best next claw.
-                if extension.len() > best_extension.len() {
-                    best_next_claw = Some(c1.clone());
-                    best_extension = extension;
-                }
-            }
-
-            if let Some(next_claw) = best_next_claw {
-                cluster.append(next_claw, best_extension);
-            } else {
-                continue 'cluster;
-            }
-        }
-
-        if cluster.extension.len() >= min_ext_len {
-            println!("{} {}", cluster.base.len(), cluster.extension.len());
-            for n in &cluster.nodes {
-                used_nodes.insert(n.clone());
-            }
-            clusters.push(cluster);
-            new_clusters += 1;
-        }
-    }
-
-    nodes.retain(|n| !used_nodes.contains(n));
-    clusters
-}
-
-
-fn print_stats1(nodes: &[Node]) {
-    let mut triples = 0;
-    let mut quads = 0;
-    for n in nodes {
-        match n {
-            Node::Triple(_) => triples += 1,
-            Node::Quad(_) => quads += 1,
-        }
-    }
-
-    println!("triples = {}, quads = {}", triples, quads);
-}
-
-fn print_weak_edges(nodes: &[Node]) {
-    let edges = mk_edge_weights(nodes);
-    let weak_edges = edges.values().filter(|ns| **ns < 3).count();
-    println!("weak edges = {}", weak_edges);
-}
-
-fn mk_claw(node: &Node, edge_ix: &EdgeIx<Node>) -> Option<Claw> {
-    let mut children = vec![];
-
-    for e in node.edges() {
-        let child = edge_ix
-            .get(&e)
-            .unwrap()
-            .iter()
-            .filter(|n| n.is_triple() && *n != node)
-            .next();
-        if let Some(child) = child {
-            children.push(*child);
-        } else {
-            return None;
-        }
-    }
-
-    Some(Claw::new(node, &children))
-}
-
-//fn save_all(clusters: &[Cluster], file_name: &str) -> anyhow::Result<()> {
-//    let file = File::create(file_name)?;
-//    let mut writer = BufWriter::new(file);
-//    serde_json::to_writer(&mut writer, &clusters)?;
-//    Ok(writer.flush()?)
-//}
