@@ -43,7 +43,11 @@ export function filterByLinkWeight(ts, {minWeight}) {
 }
 
 export function mkTriples(N) {
-    const all = pythagoreanTriples(N);
+    // const all = pythagoreanTriples(N);
+    const all = filterByLinkWeight(
+      pythagoreanTriples(N),
+      {minWeight: 2}
+    );
 
     const by_edge = {};
     for(let t of all) {

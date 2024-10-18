@@ -122,10 +122,37 @@ while(true) {
 
 display(clusters);
 display(used_knots.size);
-const covered_edges = [...new Set(clusters.flat().flat().flat())].sort((a,b) => b-a);
-display(covered_edges);
-const covered_triples = [...new Set(clusters.flat().flat().map(JSON.stringify))].sort();
-display(covered_triples);
+
+const covered_edges = new Set(clusters.flat().flat().flat());
+const uncovered_edges = Object.entries(triples.by_edge)
+    .filter(([e,ts]) => !covered_edges.has(parseInt(e)));
+
+display({
+    covered_edges,
+    uncovered_edges,
+    total_edges: Object.keys(triples.by_edge).length
+});
+
+display({
+    uncovered_edges_hist: uncovered_edges
+        .map(([_,ts]) => ts.length)
+        .reduce(
+            (r,x) => {
+                if(x in r) { r[x] += 1 } else { r[x] = 1 };
+                return r;
+            }, {})
+});
+
+const covered_triples = new Set(clusters.flat().flat().map(JSON.stringify));
+display({covered_triples, total_triples: triples.all.length});
+
+const uncovered_triples = triples.all.filter(t => !covered_triples.has(JSON.stringify(t)));
+display({uncovered_triples});
+
+const uncovered_graph = triplesToGraph(uncovered_triples);
+applyLayout(uncovered_graph);
+display(graphSVG(uncovered_graph));
+
 ```
 
 ```js
