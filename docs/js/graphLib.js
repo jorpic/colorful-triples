@@ -41,3 +41,36 @@ export function filterByLinkWeight(ts, {minWeight}) {
     if (deleted == 0) return [...ts];
   }
 }
+
+export function mkTriples(N) {
+    const all = pythagoreanTriples(N);
+
+    const by_edge = {};
+    for(let t of all) {
+        for(let e of t) {
+            if(e in by_edge) {
+                by_edge[e].push(t);
+            } else {
+                by_edge[e] = [t];
+            }
+        }
+    }
+
+    const by_first_edge = {};
+    for(let t of all) {
+        const e = t[0];
+        if(e in by_first_edge) {
+            by_first_edge[e].push(t);
+        } else {
+            by_first_edge[e] = [t];
+        }
+    }
+
+    const is_valid = (t) => {
+        const ts = by_first_edge[t[0]];
+        return ts != undefined
+            && ts.some(x => x[1] == t[1] && x[2] == t[2]);
+    };
+
+    return { all, by_edge, by_first_edge, is_valid };
+}
