@@ -23,7 +23,13 @@ pyramid2
   $ sequence
   $ replicate 3 pyramid1
 
-knot
+knot4
+  = filter (\[[x,a,b], [y,c,d], [a1,d1,g], [b1,c1,h]] ->
+    a == a1 && b == b1 && c == c1 && d == d1)
+  $ sequence
+  $ replicate 4 triple
+
+knot6
   = filter (\[[a,b,c], [a1,d,e], [b1,f,g], [c1,h,x], [d1,f1,h1], [e1,g1,x1]] ->
     a == a1 && b == b1 && c == c1 && d == d1 && e == e1 && f == f1 && g == g1 && h == h1 && x == x1)
   $ sequence
