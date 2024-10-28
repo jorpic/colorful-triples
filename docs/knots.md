@@ -42,12 +42,6 @@ applyLayout(graph);
 display(graphSVG(graph));
 ```
 
-## Joined 4-knots
-
-```js
-// TODO
-```
-
 # 6-knots
 
 ```js
@@ -89,41 +83,7 @@ display(graphSVG(graph));
 ```
 
 ```js
-const clusters = [];
-const used_knots = new Set();
-while(true) {
-    const used_edges = new Set();
-    const cluster = [];
-
-    for(let k of k6s) {
-        if(used_knots.has(k)) {
-            continue;
-        }
-        let k_edges = [...new Set(k.flat().flat())];
-        if(k_edges.some(e => used_edges.has(e))) {
-            continue;
-        }
-
-        for(let e of k_edges) {
-            used_edges.add(e);
-        }
-        used_knots.add(k);
-        cluster.push(k);
-        if(cluster.length == 5) {
-            break;
-        }
-    }
-
-    if(cluster.length < 5) {
-        break;
-    }
-    clusters.push(cluster);
-}
-
-display(clusters);
-display(used_knots.size);
-
-const covered_edges = new Set(clusters.flat().flat().flat());
+const covered_edges = new Set(k6s.flat().flat());
 const uncovered_edges = Object.entries(triples.by_edge)
     .filter(([e,ts]) => !covered_edges.has(parseInt(e)));
 
@@ -143,7 +103,7 @@ display({
             }, {})
 });
 
-const covered_triples = new Set(clusters.flat().flat().map(JSON.stringify));
+const covered_triples = new Set(k6s.flat().map(JSON.stringify));
 display({covered_triples, total_triples: triples.all.length});
 
 const uncovered_triples = triples.all.filter(t => !covered_triples.has(JSON.stringify(t)));
@@ -152,20 +112,6 @@ display({uncovered_triples});
 const uncovered_graph = triplesToGraph(uncovered_triples);
 applyLayout(uncovered_graph);
 display(graphSVG(uncovered_graph));
-
-```
-
-```js
-const clusters_edges = clusters.map(c => new Set(c.flat().flat()));
-display(clusters_edges);
-const intersections = [];
-for(let i = 0; i < clusters_edges.length; i++) {
-    for(let j = i+1; j < clusters_edges.length; j++) {
-        const c = [...clusters_edges[i]].filter(e => clusters_edges[j].has(e)).length;
-        if(c > 13) intersections.push({ i, j, c });
-    }
-}
-display(intersections);
 ```
 
 
