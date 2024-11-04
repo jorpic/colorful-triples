@@ -54,3 +54,33 @@ fromBits = foldl (\r x -> 2*r + x) 0
 
 diff :: [Int] -> [Int]
 diff xs = zipWith subtract xs $ tail xs
+
+
+knot6_values
+  = map (\[[a,b,c], [_,d,e], [_,f,g], [_,h,x], [_,_,_], [_,_,_]] -> [a,b,c,d,e,f,g,h,x])
+  $ knot6
+
+knot6_triples
+  = filter (\(es, xs) -> length xs < 8)
+  $ map (\es -> (es, subset_values es)) edge_subsets
+  where
+    subset_values es = nub $ sort $ [[xs !! e | e <- es] | xs <- knot6_values]
+    edge_subsets = [[a,b,c] | a <- [0..8], b <- [a+1..8], c <- [b+1..8]]
+
+-- -- Now we know that knot6 does not impose any constraints on 3-edge subsets
+-- -- other than triples.
+-- *Main> mapM_ print knot6_triples
+-- ([0,1,2],[[0,0,1],[0,1,0],[0,1,1],[1,0,0],[1,0,1],[1,1,0]])
+-- ([0,3,4],[[0,0,1],[0,1,0],[0,1,1],[1,0,0],[1,0,1],[1,1,0]])
+-- ([1,5,6],[[0,0,1],[0,1,0],[0,1,1],[1,0,0],[1,0,1],[1,1,0]])
+-- ([2,7,8],[[0,0,1],[0,1,0],[0,1,1],[1,0,0],[1,0,1],[1,1,0]])
+-- ([3,5,7],[[0,0,1],[0,1,0],[0,1,1],[1,0,0],[1,0,1],[1,1,0]])
+-- ([4,6,8],[[0,0,1],[0,1,0],[0,1,1],[1,0,0],[1,0,1],[1,1,0]])
+
+
+knot6_3 [a,b,c]
+  = filter (\[xs,ys,zs] ->
+    let xyz = (xs !! a, ys !! b, zs !! c)
+    in xyz /= (1,1,1) && xyz /= (0,0,0))
+  $ sequence
+  $ replicate 3 knot6_values

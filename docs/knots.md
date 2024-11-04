@@ -104,14 +104,140 @@ display({
 });
 
 const covered_triples = new Set(k6s.flat().map(JSON.stringify));
-display({covered_triples, total_triples: triples.all.length});
-
 const uncovered_triples = triples.all.filter(t => !covered_triples.has(JSON.stringify(t)));
-display({uncovered_triples});
+display({covered_triples, total_triples: triples.all.length, uncovered_triples});
+```
 
-const uncovered_graph = triplesToGraph(uncovered_triples);
+How many uncovered triples each knot touches?
+
+```js
+display(
+    k6s.map(k => {
+        const k_edges = new Set(k.flat());
+        return {k, xs: uncovered_triples.filter(t => t.some(e => k_edges.has(e)))};
+    })
+);
+```
+
+
+Cover triples with knots:
+
+```js
+const knot_ix = k6s.reduce((r,k) => {
+    const k_edges = [...new Set(k.flat())];
+    for(let e of k_edges) {
+        if(e in r) {
+            r[e].push(k);
+        } else {
+            r[e] = [k];
+        }
+    }
+    return r;
+}, {});
+
+display({
+    knot_ix,
+    triple_covers: uncovered_triples.map(t => ({t, ks: t.map(e => knot_ix[e] || null)})),
+    schemes: uncovered_triples.map(t => t.map(
+        e => JSON.stringify((knot_ix[e] || [])
+            .map(k => k.flat().indexOf(e)))
+    ))
+});
+
+display({
+  "[_,_,11]":
+    uncovered_triples
+      .map(t => ({t,
+        s: t.map(
+          e => (knot_ix[e] || []).map(k => k.flat().indexOf(e))
+        )}))
+      .filter(xs => xs.s.every(x => x.length > 0))
+      .filter(xs => xs.s[2].indexOf(11) < 0)
+      .map(xs => JSON.stringify(xs))
+});
+```
+
+Uncovered triples that can't be covered by knots.
+
+```js
+display(
+    uncovered_triples.filter(t => !t.every(e => covered_edges.has(e)))
+);
+```
+
+```js
+function mkGraphWithLinks(triples) {
+    const nodes = triples
+        .map(links => ({links, type: "triple"}));
+
+    for(let e of [...new Set(triples.flat())]) {
+        if(!covered_edges.has(e)) {
+            nodes.push({link: e, type: "edge", isCovered: covered_edges.has(e)});
+        }
+    }
+
+    const edge_to_id = {};
+    nodes.forEach((n, id) => {
+        n.id = id;
+        if(n.type === "edge") {
+            edge_to_id[n.link] = id;
+        }
+    });
+
+    const edges = [];
+    for(let i = 0; i < nodes.length; i++) {
+        const n = nodes[i];
+        if(n.type === "triple") {
+            for(let e of n.links) {
+                if(edge_to_id[e]) {
+                    edges.push({source: n.id, target: edge_to_id[e]});
+                }
+            }
+        }
+    }
+    return {nodes, edges};
+}
+
+function graphWithLinks(graph) {
+    const [mx, my, w, h] = graph.viewBox;
+    const margin = 10;
+    const viewBox = [mx - margin, my - margin, w + 2*margin, h + 2*margin];
+
+    const svg = d3.create("svg")
+        .attr("preserveAspectRatio", "xMidYMid")
+        .attr("viewBox", viewBox);
+
+    svg.selectAll("edge")
+        .data(graph.edges)
+        .join("line")
+        .attr("stroke", "grey")
+        .attr("stroke-width", 1)
+        .attr("x1", e => e.source.x)
+        .attr("y1", e => e.source.y)
+        .attr("x2", e => e.target.x)
+        .attr("y2", e => e.target.y);
+
+    svg.selectAll("node")
+    .data(graph.nodes)
+    .join("circle")
+        .attr("fill", n =>
+            n.type === "triple" ? "black" : n.isCovered ? "green" : "red")
+        .attr("cx", n => n.x)
+        .attr("cy", n => n.y)
+        .attr("r", n => n.type === "triple" ? 8 : 8)
+        .append("title").text(n => JSON.stringify(n));
+
+    return svg.node();
+}
+```
+
+```js
+
+const uncovered_graph = mkGraphWithLinks(
+    uncovered_triples.filter(t => !t.every(e => covered_edges.has(e)))
+);
 applyLayout(uncovered_graph);
-display(graphSVG(uncovered_graph));
+display(graphWithLinks(uncovered_graph));
 ```
 
 
