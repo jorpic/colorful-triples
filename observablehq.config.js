@@ -4,6 +4,7 @@ export default {
     {
       name: "Pages",
       pages: [
+        {name: "Knot covers", path: "/knot-covers"},
         {name: "Knots", path: "/knots"},
         {name: "Drop 2-links", path: "/mergedNodes"},
         {name: "Pendants", path: "/pendants"},

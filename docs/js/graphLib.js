@@ -42,12 +42,10 @@ export function filterByLinkWeight(ts, {minWeight}) {
   }
 }
 
-export function mkTriples(N) {
-    // const all = pythagoreanTriples(N);
-    const all = filterByLinkWeight(
-      pythagoreanTriples(N),
-      {minWeight: 2}
-    );
+export function mkTriples(N, {dropPendants}) {
+    const all = dropPendants
+      ? filterByLinkWeight(pythagoreanTriples(N), {minWeight: 2})
+      : pythagoreanTriples(N);
 
     const by_edge = {};
     for(let t of all) {
@@ -60,6 +58,9 @@ export function mkTriples(N) {
         }
     }
 
+    const all_edges = [...new Set(all.flat())]
+      .sort((a,b) => a-b);
+
     const by_first_edge = {};
     for(let t of all) {
         const e = t[0];
@@ -70,11 +71,10 @@ export function mkTriples(N) {
         }
     }
 
-    const is_valid = (t) => {
-        const ts = by_first_edge[t[0]];
-        return ts != undefined
-            && ts.some(x => x[1] == t[1] && x[2] == t[2]);
-    };
+    const get = (a, b, c) => (by_first_edge[a] || [])
+        .find(t => b === t[1] && c === t[2]);
 
-    return { all, by_edge, by_first_edge, is_valid };
+    const is_valid = (t) => !!get(...t);
+
+    return { all, all_edges, by_edge, by_first_edge, get, is_valid };
 }

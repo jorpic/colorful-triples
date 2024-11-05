@@ -7,7 +7,7 @@ import {applyLayout} from "./js/pendants.js";
 
 ```js
 const N = 7825;
-const triples = mkTriples(N);
+const triples = mkTriples(N, {dropPendants: true});
 ```
 
 ```js
@@ -164,6 +164,8 @@ display(
     uncovered_triples.filter(t => !t.every(e => covered_edges.has(e)))
 );
 ```
+
+
 
 ```js
 function mkGraphWithLinks(triples) {
